@@ -1,28 +1,42 @@
-[BITS 16]
-[ORG 0x7C00]
+bits 16
+org 0x7C00
 
 cli
 xor ax, ax
-mov ds, ax
 mov ss, ax
+mov ds, ax
+mov es, ax
 mov sp, 0x7C00
 
-mov bx, msg
-mov ah, 0x0E
+mov ah, 2
+mov al, 1
+mov bx, 0x7E00
+xor dh, dh
+xor ch, ch
+mov cl, 2
 
-printLoop:
-    mov al, [bx]
-    test al, al
-    jz loop
-    int 0x10
-    inc bx
-    jmp printLoop
+; pmemsave 0x7E00 110 out
+
+int 0x13
+jc err
 
 loop:
     jmp loop
 
-msg:
-    db "Hello world!", 0x0A, 0x0D, 0
+err:
+    mov ah, 0x0E
+    mov bx, errMsg
+    printLoop:
+        mov al, [bx]
+        test al, al
+        jz loop
+        int 0x10
+        inc bx
+        jmp printLoop
+    hlt
+
+errMsg:
+    db "Error reading from disk", 0x0A, 0x0D, 0
 
 times 510-($-$$) db 0
 dw 0xAA55
