@@ -1,7 +1,7 @@
 bits 16
 org 0x7C00
 
-; pmemsave 0x7E00 14696 out
+; pmemsave 0x7E00 205048 out
 
 ; geometry: https://www.deathwombat.com/diskgeometry.html
 %define SECTORS_PER_TRACK 18
@@ -26,13 +26,18 @@ xor dh, dh        ; header number = 0
 xor ch, ch        ; cylinder number = 0
 mov cl, 2         ; sector number = 2 (to skip the first sector)
 
+mov si, (PAYLOAD_SIZE/512+(PAYLOAD_SIZE % 512!=0))
+
 readLoop:
     ; this should be reset each time because BIOS resets `ah`
     mov ah, 2     ; function number (0x2 - read sectors)
     int 0x13      ; read
     jc handleErr
 
-    add bx, 0x200 ; move dest
+    mov di, es
+    add di, 0x20  ; move dest
+    mov es, di
+
     inc cl        ; next sector
     cmp cl, SECTORS_PER_TRACK
     jbe .continueReading
@@ -40,15 +45,15 @@ readLoop:
     mov cl, 1     ; reset sector number to 1
     inc dh        ; move header
     cmp dh, HEADS_PER_CYLINDER
-    jbe .continueReading
+    jb .continueReading
     ; should change cylinder
     xor dh, dh    ; reset header
     inc ch        ; next cylinder
     cmp ch, CYLINDERS
     jae handleErr ; in case we go too far
 .continueReading:
-    cmp bx, PAYLOAD_SIZE
-    jb readLoop
+    dec si
+    jnz readLoop
 
 end:
     hlt
