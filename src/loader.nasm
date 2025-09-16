@@ -3,12 +3,11 @@ org 0x7C00
 
 ; pmemsave 0x7E00 205048 out
 
-%define SECTORS_TO_LOAD (PAYLOAD_SIZE/512+(PAYLOAD_SIZE % 512!=0))
+%define SECTORS_TO_LOAD ((PAYLOAD_SIZE / 512) + ((PAYLOAD_SIZE % 512) != 0))
 
 ; geometry: https://www.deathwombat.com/diskgeometry.html
 %define SECTORS_PER_TRACK 18
 %define HEADS_PER_CYLINDER 2
-%define CYLINDERS 80
 
 cli
 xor ax, ax
@@ -24,9 +23,9 @@ mov es, ax
 
 mov al, 1         ; amount of sectors to read
 
-xor dh, dh        ; header number = 0
+xor dh, dh        ; header number   = 0
 xor ch, ch        ; cylinder number = 0
-mov cl, 2         ; sector number = 2 (to skip the first sector)
+mov cl, 2         ; sector number   = 2 (to skip the first sector)
 
 mov si, SECTORS_TO_LOAD
 
@@ -51,8 +50,6 @@ readLoop:
     ; should change cylinder
     xor dh, dh    ; reset header
     inc ch        ; next cylinder
-    cmp ch, CYLINDERS
-    jae handleErr ; in case we go too far
 .continueReading:
     dec si
     jnz readLoop
