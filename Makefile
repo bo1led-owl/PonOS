@@ -6,10 +6,7 @@ run: $(IMG)
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
 debug: $(IMG)
-	qemu-system-x86_64 $(QEMU_FLAGS) -s -S & gdb
-
-diff:
-	head -c $(shell python -c "print($(PAYLOAD_SIZE)+512)") $(IMG) | diff out -
+	qemu-system-x86_64 $(QEMU_FLAGS) -s -S & lldb --local-lldbinit
 
 build/main.bin: build src/loader.nasm
 	nasm -fbin -dPAYLOAD_SIZE=$(PAYLOAD_SIZE) src/loader.nasm -o build/main.bin
