@@ -52,9 +52,11 @@ readLoop:
 ; going into 32 bit mode
 lgdt [gdt_descriptor]
 cld
+
 mov eax, cr0
 or eax, 1
 mov cr0, eax
+
 jmp CODE_SEGMENT:trampoline
 
 bits 32
