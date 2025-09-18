@@ -5,6 +5,6 @@ export fn kernelEntry() callconv(.Naked) noreturn {
     while (true) {}
 }
 
-export fn main() callconv(.C) void {
+export fn main() void {
     @as(*u16, @ptrFromInt(0xB8000)).* = 0;
 }
