@@ -1,2 +1,3 @@
 build/
-target/
+zig-out/
+.zig-cache/

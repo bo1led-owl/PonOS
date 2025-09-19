@@ -1,9 +1,5 @@
 bits 16
-org 0x7C00
-
-; pmemsave 0x7E00 205048 out
-
-%define SECTORS_TO_LOAD ((PAYLOAD_SIZE / 512) + ((PAYLOAD_SIZE % 512) != 0))
+section .boot
 
 ; geometry: https://www.deathwombat.com/diskgeometry.html
 %define SECTORS_PER_TRACK 18
@@ -15,48 +11,69 @@ xor ax, ax
 mov ss, ax
 mov sp, 0x7C00
 
-mov bx, ax
-mov ds, ax
+xor bx, bx
+mov ds, bx
 
-mov ax, 0x7E0     ; minus one zero because segment registers are shifted
+mov ax, 0x7E0 ; minus one zero because segment registers are shifted
 mov es, ax
 
-mov al, 1         ; amount of sectors to read
+xor dh, dh ; header number   = 0
+xor ch, ch ; cylinder number = 0
+mov cl, 2  ; sector number   = 2 (to skip the first sector)
 
-xor dh, dh        ; header number   = 0
-xor ch, ch        ; cylinder number = 0
-mov cl, 2         ; sector number   = 2 (to skip the first sector)
-
-mov si, SECTORS_TO_LOAD
+mov al, 1
+mov si, (KERNEL_SIZE_KB * 2) ; sectors to load
 
 readLoop:
-    ; this should be reset each time because BIOS resets `ah`
-    mov ah, 2     ; function number (0x2 - read sectors)
-    int 0x13      ; read
+    mov ah, 2
+    int 0x13 ; read
     jc handleErr
-
+    
     mov di, es
-    add di, 0x20  ; move dest
+    add di, 0x40 ; move dest
     mov es, di
 
-    inc cl        ; next sector
+    add cl, 1 ; next sector
     cmp cl, SECTORS_PER_TRACK
     jbe .continueReading
     ; should move header
-    mov cl, 1     ; reset sector number to 1
-    inc dh        ; move header
+    mov cl, 1 ; reset sector number to 1
+    inc dh    ; move header
     cmp dh, HEADS_PER_CYLINDER
     jb .continueReading
     ; should change cylinder
-    xor dh, dh    ; reset header
-    inc ch        ; next cylinder
+    xor dh, dh ; reset header
+    inc ch     ; next cylinder
 .continueReading:
-    dec si
+    sub si, 1
     jnz readLoop
+
+; going into 32 bit mode
+lgdt [gdt_descriptor]
+cld
+
+mov eax, cr0
+or  eax, 1
+mov cr0, eax
+
+jmp CODE_SEGMENT:trampoline
+
+bits 32
+trampoline:
+mov eax, DATA_SEGMENT
+mov ds, eax
+mov ss, eax
+mov es, eax
+mov fs, eax
+mov gs, eax
+
+extern kernelEntry
+jmp kernelEntry
 
 end:
     hlt
 
+bits 16
 handleErr:
     mov ah, 0x0E
     mov bx, errMsg
@@ -69,6 +86,31 @@ handleErr:
         jmp .printLoop
 
 errMsg: db "Error reading from disk", 0
+
+gdt_descriptor:
+  dw 0x17
+  dd gdt
+
+align 8
+gdt:
+    .null:                  dq 0
+    csd:
+        .limitLo:           dw 0xFF
+        .baseLo:            dw 0
+        .baseMid:           db 0
+        .P_DPL_S_type:      db 0b1001_1010
+        .G_B_0_AVL_limitHi: db 0b1100_1111
+        .baseHi:            db 0
+    dsd:
+        .limitLo:           dw 0xFF
+        .baseLo:            dw 0
+        .baseMid:           db 0
+        .P_DPL_S_type:      db 0b1001_0010
+        .G_B_0_AVL_limitHi: db 0b1100_1111
+        .baseHi:            db 0
+
+CODE_SEGMENT equ 8
+DATA_SEGMENT equ 16
 
 times 510-($-$$) db 0
 dw 0xAA55
