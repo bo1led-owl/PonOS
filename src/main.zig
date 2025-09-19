@@ -1,7 +1,7 @@
 const std = @import("std");
 
 export fn kernelEntry() callconv(.Naked) noreturn {
-    asm volatile ("jmp main");
+    asm volatile ("call main");
     while (true) {}
 }
 

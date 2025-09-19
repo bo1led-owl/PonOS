@@ -69,7 +69,8 @@ mov fs, eax
 mov gs, eax
 
 extern kernelEntry
-call kernelEntry
+sub esp, 12
+jmp kernelEntry
 
 end:
     hlt

@@ -29,6 +29,7 @@ pub fn build(b: *std.Build) !void {
         .pic = false,
         .single_threaded = true,
         .link_libc = false,
+        .stack_protector = false,
         .strip = false,
     });
 
