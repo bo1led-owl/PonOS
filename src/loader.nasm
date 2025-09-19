@@ -4,7 +4,6 @@ section .boot
 ; geometry: https://www.deathwombat.com/diskgeometry.html
 %define SECTORS_PER_TRACK 18
 %define HEADS_PER_CYLINDER 2
-%define SECTOR_PAIRS_TO_LOAD ((0x80000 - 0x7E00) / 1024)
 
 cli
 xor ax, ax
@@ -22,18 +21,19 @@ xor dh, dh ; header number   = 0
 xor ch, ch ; cylinder number = 0
 mov cl, 2  ; sector number   = 2 (to skip the first sector)
 
-mov si, SECTOR_PAIRS_TO_LOAD
+mov al, 1
+mov si, (KERNEL_SIZE_KB * 2) ; sectors to load
 
 readLoop:
-    mov ax, 0x0202 ; function : sectors to read
+    mov ah, 2
     int 0x13       ; read
     jc handleErr
-
+    
     mov di, es
     add di, 0x40 ; move dest
     mov es, di
 
-    add cl, 2 ; next kb
+    add cl, 1 ; next sector
     cmp cl, SECTORS_PER_TRACK
     jbe .continueReading
     ; should move header
@@ -45,7 +45,7 @@ readLoop:
     xor dh, dh ; reset header
     inc ch     ; next cylinder
 .continueReading:
-    sub si, 2
+    sub si, 1
     jnz readLoop
 
 ; going into 32 bit mode

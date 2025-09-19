@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const KERNEL_SIZE_KB = 40;
+
 pub fn build(b: *std.Build) !void {
     var disabled_features = std.Target.Cpu.Feature.Set.empty;
     var enabled_features = std.Target.Cpu.Feature.Set.empty;
@@ -40,7 +42,7 @@ pub fn build(b: *std.Build) !void {
     kernel.entry = .{ .symbol_name = "kernelEntry" };
     kernel.bundle_compiler_rt = false;
     kernel.bundle_ubsan_rt = false;
-    kernel.addObjectFile(addNasm(b, b.path("src/loader.nasm"), "loader.o"));
+    kernel.addObjectFile(addLoader(b, b.path("src/loader.nasm"), "loader.o", KERNEL_SIZE_KB));
     kernel.setLinkerScript(b.path("link.ld"));
 
     b.getInstallStep().dependOn(&b.addInstallFile(kernel.getEmittedBin(), "kernel.o").step);
@@ -72,8 +74,13 @@ pub fn build(b: *std.Build) !void {
     run_step.dependOn(&run_image.step);
 }
 
-pub fn addNasm(b: *std.Build, source: std.Build.LazyPath, name: []const u8) std.Build.LazyPath {
-    const cmd = b.addSystemCommand(&.{ "nasm", "-O0", "-felf", "-o" });
+pub fn addLoader(
+    b: *std.Build,
+    source: std.Build.LazyPath,
+    name: []const u8,
+    kernel_size_kb: usize,
+) std.Build.LazyPath {
+    const cmd = b.addSystemCommand(&.{ "nasm", "-felf32", b.fmt("-DKERNEL_SIZE_KB={d}", .{kernel_size_kb}), "-o" });
     const res = cmd.addOutputFileArg(name);
     cmd.addFileArg(source);
     return res;
