@@ -15,36 +15,35 @@ mov sp, 0x7C00
 xor bx, bx
 mov ds, bx
 
-mov ax, 0x7E0     ; minus one zero because segment registers are shifted
+mov ax, 0x7E0 ; minus one zero because segment registers are shifted
 mov es, ax
 
-xor dh, dh        ; header number   = 0
-xor ch, ch        ; cylinder number = 0
-mov cl, 2         ; sector number   = 2 (to skip the first sector)
+xor dh, dh ; header number   = 0
+xor ch, ch ; cylinder number = 0
+mov cl, 2  ; sector number   = 2 (to skip the first sector)
 
 mov si, SECTOR_PAIRS_TO_LOAD
 
 readLoop:
-    ; function : sectors to read
-    mov ax, 0x0202
-    int 0x13      ; read
-    ; jc handleErr
+    mov ax, 0x0202 ; function : sectors to read
+    int 0x13       ; read
+    jc handleErr
 
     mov di, es
-    add di, 0x40  ; move dest
+    add di, 0x40 ; move dest
     mov es, di
 
-    add cl, 2     ; next kb
+    add cl, 2 ; next kb
     cmp cl, SECTORS_PER_TRACK
     jbe .continueReading
     ; should move header
-    mov cl, 1     ; reset sector number to 1
-    inc dh        ; move header
+    mov cl, 1 ; reset sector number to 1
+    inc dh    ; move header
     cmp dh, HEADS_PER_CYLINDER
     jb .continueReading
     ; should change cylinder
-    xor dh, dh    ; reset header
-    inc ch        ; next cylinder
+    xor dh, dh ; reset header
+    inc ch     ; next cylinder
 .continueReading:
     sub si, 2
     jnz readLoop
