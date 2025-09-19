@@ -1,8 +1,10 @@
 const std = @import("std");
 
 export fn kernelEntry() callconv(.Naked) noreturn {
-    asm volatile ("call main");
-    while (true) {}
+    asm volatile (
+        \\ call main
+        \\ hlt
+    );
 }
 
 export fn main() void {

@@ -2,15 +2,15 @@ const std = @import("std");
 
 const KERNEL_SIZE_KB = 40;
 
-pub fn build(b: *std.Build) !void {
+pub fn build(b: *std.Build) void {
     var disabled_features = std.Target.Cpu.Feature.Set.empty;
-    var enabled_features = std.Target.Cpu.Feature.Set.empty;
+    const enabled_features = std.Target.Cpu.Feature.Set.empty;
 
     disabled_features.addFeature(@intFromEnum(std.Target.x86.Feature.x87));
     disabled_features.addFeature(@intFromEnum(std.Target.x86.Feature.mmx));
     disabled_features.addFeature(@intFromEnum(std.Target.x86.Feature.sse));
     disabled_features.addFeature(@intFromEnum(std.Target.x86.Feature.sse2));
-    enabled_features.addFeature(@intFromEnum(std.Target.x86.Feature.soft_float));
+    // enabled_features.addFeature(@intFromEnum(std.Target.x86.Feature.soft_float));
 
     const i386_freestanding = b.resolveTargetQuery(.{
         .cpu_arch = std.Target.Cpu.Arch.x86,
@@ -21,7 +21,7 @@ pub fn build(b: *std.Build) !void {
         .cpu_features_add = enabled_features,
     });
 
-    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSmall });
+    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseFast });
 
     const kernel_mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
@@ -38,6 +38,7 @@ pub fn build(b: *std.Build) !void {
     const kernel = b.addExecutable(.{
         .name = "kernel.o",
         .root_module = kernel_mod,
+        .optimize = optimize,
     });
     kernel.entry = .{ .symbol_name = "kernelEntry" };
     kernel.bundle_compiler_rt = false;
@@ -59,11 +60,7 @@ pub fn build(b: *std.Build) !void {
     b.installArtifact(kernel);
 
     const run_image = b.addSystemCommand(&.{
-        "qemu-system-i386", "-cpu",
-        "pentium2",         "-m",
-        "4g",               "-monitor",
-        "stdio",            "-device",
-        "VGA",              "-fda",
+        "qemu-system-i386", "-cpu", "pentium2", "-m", "4g", "-monitor", "stdio", "-device", "VGA", "-fda",
     });
     run_image.addFileArg(boot_img);
     if (b.args) |args| {
@@ -80,7 +77,12 @@ pub fn addLoader(
     name: []const u8,
     kernel_size_kb: usize,
 ) std.Build.LazyPath {
-    const cmd = b.addSystemCommand(&.{ "nasm", "-felf32", b.fmt("-DKERNEL_SIZE_KB={d}", .{kernel_size_kb}), "-o" });
+    const cmd = b.addSystemCommand(&.{
+        "nasm",
+        "-felf32",
+        b.fmt("-DKERNEL_SIZE_KB={d}", .{kernel_size_kb}),
+        "-o",
+    });
     const res = cmd.addOutputFileArg(name);
     cmd.addFileArg(source);
     return res;

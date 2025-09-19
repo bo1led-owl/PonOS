@@ -26,7 +26,7 @@ mov si, (KERNEL_SIZE_KB * 2) ; sectors to load
 
 readLoop:
     mov ah, 2
-    int 0x13       ; read
+    int 0x13 ; read
     jc handleErr
     
     mov di, es
@@ -53,7 +53,7 @@ lgdt [gdt_descriptor]
 cld
 
 mov eax, cr0
-or eax, 1
+or  eax, 1
 mov cr0, eax
 
 jmp CODE_SEGMENT:trampoline
@@ -68,7 +68,6 @@ mov fs, eax
 mov gs, eax
 
 extern kernelEntry
-sub esp, 12
 jmp kernelEntry
 
 end:
