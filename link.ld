@@ -1,7 +1,7 @@
 SECTIONS {
     . = 0x7C00;
     .boot : {
-        KEEP(*(.boot))
+        build/loader.o (.text);
     }
 
     .kernel : {

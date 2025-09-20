@@ -1,5 +1,4 @@
 bits 16
-section .boot
 
 ; geometry: https://www.deathwombat.com/diskgeometry.html
 %define SECTORS_PER_TRACK 18
@@ -68,10 +67,16 @@ mov fs, eax
 mov gs, eax
 
 extern kernelEntry
-jmp kernelEntry
+call kernelEntry
 
 end:
     hlt
+
+; utils
+
+global infiniteLoop
+infiniteLoop:
+    jmp infiniteLoop
 
 bits 16
 handleErr:
