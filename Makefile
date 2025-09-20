@@ -32,4 +32,7 @@ $(IMG): $(KERNEL_BIN)
 build:
 	mkdir build
 
-.PHONY: run debug
+clean:
+	rm -fr build
+
+.PHONY: run debug clean
