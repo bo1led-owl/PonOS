@@ -1,3 +1,4 @@
 #pragma once
 
-[[noreturn]] extern void infiniteLoop();
+[[noreturn]] void infiniteLoop();
+void cli();
