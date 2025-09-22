@@ -10,91 +10,124 @@ static VgaChar vgaChar(Color bg, Color fg, char c) {
     return (bg << 12) | (fg << 8) | ((u8)c & 0xFF);
 }
 
-static Color bg_color = Color_Black;
-static Color fg_color = Color_White;
-
-static usize x = 0;
-static usize y = 0;
-static VgaChar* buffer = (VgaChar*)0xB8000;
-
 constexpr usize COLUMNS = 80;
 constexpr usize ROWS = 25;
-constexpr usize BUF_SIZE = (COLUMNS * ROWS * sizeof(VgaChar));
+static VgaChar* main_buffer = (VgaChar*)0xB8000;
 
-static void putcharRaw(char c, usize x, usize y) {
-    *(buffer + COLUMNS * y + x) = vgaChar(bg_color, fg_color, c);
+typedef struct Window {
+    VgaChar* buffer;
+    Color bg, fg;
+    usize x, y;
+    usize rows, columns;
+} Window;
+
+static Window windows[MAX_WINDOWS] = {};
+static usize n_windows = 0;
+
+static Window mw = (Window){
+    .bg = Color_Black,
+    .fg = Color_White,
+    .buffer = (VgaChar*)0xB8000,
+    .rows = ROWS,
+    .columns = COLUMNS,
+    .x = 0,
+    .y = 0,
+};
+
+WindowHandle mainWindow() {
+    return &mw;
 }
 
-static void vgaScroll() {
-    copyForwards(buffer, buffer + COLUMNS, BUF_SIZE - COLUMNS * sizeof(VgaChar));
+static void putcharRaw(WindowHandle w, char c, usize x, usize y) {
+    *(w->buffer + y * COLUMNS + x) = vgaChar(w->bg, w->fg, c);
+}
 
-    for (usize j = 0; j < COLUMNS; ++j) {
-        putcharRaw(0, j, ROWS - 1);
+static void scroll(WindowHandle w) {
+    for (usize i = 1; i < w->rows; ++i) {
+        memcpy(w->buffer + COLUMNS * (i - 1), w->buffer + COLUMNS * i, w->columns * sizeof(VgaChar));
+    }
+
+    for (usize i = 0; i < w->columns; ++i) {
+        putcharRaw(w, 0, i, w->rows - 1);
     }
 }
 
-void vgaInit() {
-    memzero(buffer, BUF_SIZE);
-    x = y = 0;
-}
-
-void vgaClear() {
-    for (usize i = 0; i < ROWS; ++i) {
-        for (usize j = 0; j < COLUMNS; ++j) {
-            putcharRaw(0, j, i);
+void clear(WindowHandle w) {
+    for (usize i = 0; i < w->rows; ++i) {
+        for (usize j = 0; j < w->columns; ++j) {
+            putcharRaw(w, 0, j, i);
         }
     }
-
-    x = y = 0;
+    w->x = w->y = 0;
 }
 
-void vgaSetBgColor(Color c) {
-    bg_color = c;
-}
-
-void vgaSetFgColor(Color c) {
-    fg_color = c;
-}
-
-static void fixScreen() {
-    if (x >= COLUMNS) {
-        y += 1;
-        x = 0;
-    }
-
-    while (y >= ROWS) {
-        vgaScroll();
-        y -= 1;
+void initScreen() {
+    for (usize i = 0; i < n_windows; ++i) {
+        clear(windows + i);
     }
 }
 
-void putchar(char c) {
+WindowHandle addWindow(usize start_x, usize start_y, usize rows, usize columns) {
+    WindowHandle res = &windows[n_windows++];
+    *res = (Window){
+        .buffer = main_buffer + start_y * COLUMNS + start_x,
+        .columns = columns,
+        .rows = rows,
+        .bg = Color_Black,
+        .fg = Color_White,
+        .x = 0,
+        .y = 0,
+    };
+    return res;
+}
+
+void setBgColor(WindowHandle w, Color c) {
+    w->bg = c;
+}
+
+void setFgColor(WindowHandle w, Color c) {
+    w->fg = c;
+}
+
+static void fixScreen(WindowHandle w) {
+    if (w->x >= w->columns) {
+        w->y += 1;
+        w->x = 0;
+    }
+
+    while (w->y >= w->rows) {
+        scroll(w);
+        w->y -= 1;
+    }
+}
+
+void putchar(WindowHandle w, char c) {
     if (c == '\n') {
-        y += 1;
-        x = 0;
-        fixScreen();
+        w->y += 1;
+        w->x = 0;
+        fixScreen(w);
         return;
     } else if (c == '\r') {
-        x = 0;
+        w->x = 0;
         return;
     }
 
-    putcharRaw(c, x, y);
-    x += 1;
-    fixScreen();
+    putcharRaw(w, c, w->x, w->y);
+    w->x += 1;
+    fixScreen(w);
 }
 
-static void printString(const char* s) {
+static void printString(WindowHandle w, const char* s) {
     for (const char* c = s; *c; ++c) {
-        putchar(*c);
+        putchar(w, *c);
     }
 }
 
-static void printUnsigned(u32 n, u8 radix) {
+static void printUnsigned(WindowHandle w, u32 n, u8 radix) {
     assert(radix > 1);
 
     if (n == 0) {
-        putchar('0');
+        putchar(w, '0');
         return;
     }
 
@@ -119,60 +152,60 @@ static void printUnsigned(u32 n, u8 radix) {
         buf[i - j - 1] = tmp;
     }
 
-    printString(buf);
+    printString(w, buf);
 }
 
-static void printSigned(i32 n, u8 radix) {
+static void printSigned(WindowHandle w, i32 n, u8 radix) {
     if (n < 0) {
-        putchar('-');
+        putchar(w, '-');
         n *= -1;
     }
 
-    printUnsigned(n, radix);
+    printUnsigned(w, n, radix);
 }
 
-void vprintf(const char* fmt, va_list args) {
+void vprintf(WindowHandle w, const char* fmt, va_list args) {
     bool seen_percent = false;
     for (const char* c = fmt; *c; ++c) {
         if (seen_percent) {
             switch (*c) {
                 case 'd': {
                     i32 n = va_arg(args, i32);
-                    printSigned(n, 10);
+                    printSigned(w, n, 10);
                     break;
                 }
                 case 'u': {
                     u32 n = va_arg(args, u32);
-                    printUnsigned(n, 10);
+                    printUnsigned(w, n, 10);
                     break;
                 }
                 case 'b': {
                     u32 n = va_arg(args, u32);
-                    printUnsigned(n, 2);
+                    printUnsigned(w, n, 2);
                     break;
                 }
                 case 'x': {
                     u32 n = va_arg(args, u32);
-                    printUnsigned(n, 16);
+                    printUnsigned(w, n, 16);
                     break;
                 }
                 case 'c': {
                     char c = va_arg(args, int);
-                    putchar(c);
+                    putchar(w, c);
                     break;
                 }
                 case 'p': {
                     void* n = va_arg(args, void*);
-                    printUnsigned((usize)n, 16);
+                    printUnsigned(w, (usize)n, 16);
                     break;
                 }
                 case 's': {
                     const char* s = va_arg(args, const char*);
-                    printString(s);
+                    printString(w, s);
                     break;
                 }
                 case '%':
-                    putchar('%');
+                    putchar(w, '%');
                     break;
                 default:
                     panic("unknown type specifier %c\n", *c);
@@ -184,7 +217,7 @@ void vprintf(const char* fmt, va_list args) {
                     seen_percent = true;
                     break;
                 default:
-                    putchar(*c);
+                    putchar(w, *c);
                     break;
             }
         }
@@ -192,8 +225,8 @@ void vprintf(const char* fmt, va_list args) {
     va_end(args);
 }
 
-void printf(const char* fmt, ...) {
+void printf(WindowHandle w, const char* fmt, ...) {
     va_list args;
     va_start(args);
-    vprintf(fmt, args);
+    vprintf(w, fmt, args);
 }

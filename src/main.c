@@ -3,14 +3,23 @@
 #include "vga.h"
 
 [[noreturn]] void kernelEntry() {
-    vgaInit();
+    WindowHandle windows[4];
+    windows[0] = addWindow(0, 0, 10, 40);
+    windows[1] = addWindow(40, 0, 10, 40);
+    windows[2] = addWindow(0, 10, 15, 40);
+    windows[3] = addWindow(40, 10, 15, 40);
+    initScreen();
 
-    for (usize i = 0;; i += 36) {
+    setFgColor(windows[1], Color_Red);
+    setFgColor(windows[2], Color_Cyan);
+    setFgColor(windows[3], Color_Green);
+
+    for (usize i = 0;; i += 27) {
         usize size = i % 256;
         usize alignment = i % 64;
-        printf("size = %u alignment = %u: ", size, alignment);
+        printf(windows[i % 4], "size = %u alignment = %u: ", size, alignment);
         void* p = mallocImmortal(size, alignment);
-        printf("0x%p\n", p);
+        printf(windows[i % 4], "0x%p\n", p);
     }
 
     infiniteLoop();

@@ -5,10 +5,13 @@
 
 [[noreturn]] void vpanic(const char* fmt, va_list args) {
     cli();
-    vgaSetBgColor(Color_Black);
-    vgaSetFgColor(Color_Red);
-    printf("panic: ");
-    vprintf(fmt, args);
+    WindowHandle w = mainWindow();
+    // идея с синим экраном честно украдена у @EugeneKornev
+    setBgColor(w, Color_Blue);
+    setFgColor(w, Color_White);
+    clear(w);
+    printf(w, "panic: ");
+    vprintf(w, fmt, args);
     infiniteLoop();
 }
 

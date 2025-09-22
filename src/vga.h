@@ -23,12 +23,23 @@ typedef enum : u8 {
     Color_White = 0xf,
 } Color;
 
-void vgaInit();
-void vgaClear();
-void vgaSetBgColor(Color c);
-void vgaSetFgColor(Color c);
+struct Window;
+typedef struct Window* WindowHandle;
+constexpr usize MAX_WINDOWS = 32;
 
-void vprintf(const char* fmt, va_list v);
-void printf(const char* fmt, ...);
+WindowHandle addWindow(usize start_x, usize start_y, usize rows, usize columns);
 
-void putchar(char c);
+/// Initialize VGA screen with a single fullscreen window.
+void initScreen();
+WindowHandle mainWindow();
+
+/// Clear window.
+void clear(WindowHandle w);
+
+void setBgColor(WindowHandle w, Color c);
+void setFgColor(WindowHandle w, Color c);
+
+void vprintf(WindowHandle w, const char* fmt, va_list v);
+void printf(WindowHandle w, const char* fmt, ...);
+
+void putchar(WindowHandle w, char c);
