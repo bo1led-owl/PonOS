@@ -26,7 +26,7 @@ static void putcharRaw(char c, usize x, usize y) {
 }
 
 static void vgaScroll() {
-    memmove(buffer, buffer + COLUMNS, BUF_SIZE - COLUMNS * sizeof(VgaChar));
+    copyForwards(buffer, buffer + COLUMNS, BUF_SIZE - COLUMNS * sizeof(VgaChar));
 
     for (usize j = 0; j < COLUMNS; ++j) {
         putcharRaw(0, j, ROWS - 1);
@@ -133,10 +133,7 @@ static void printSigned(i32 n, u8 radix) {
 
 void vprintf(const char* fmt, va_list args) {
     bool seen_percent = false;
-    bool seen_slash = false;
     for (const char* c = fmt; *c; ++c) {
-        // %d %x %c %s \n \r
-
         if (seen_percent) {
             switch (*c) {
                 case 'd': {
@@ -147,6 +144,11 @@ void vprintf(const char* fmt, va_list args) {
                 case 'u': {
                     u32 n = va_arg(args, u32);
                     printUnsigned(n, 10);
+                    break;
+                }
+                case 'b': {
+                    u32 n = va_arg(args, u32);
+                    printUnsigned(n, 2);
                     break;
                 }
                 case 'x': {
@@ -176,28 +178,10 @@ void vprintf(const char* fmt, va_list args) {
                     panic("unknown type specifier %c\n", *c);
             }
             seen_percent = false;
-        } else if (seen_slash) {
-            switch (*c) {
-                case 'r':
-                    putchar('\r');
-                    break;
-                case 'n':
-                    putchar('\n');
-                    break;
-                case '\\':
-                    putchar('\\');
-                    break;
-                default:
-                    panic("unknown escape sequence \\%c", *c);
-            }
-            seen_slash = false;
         } else {
             switch (*c) {
                 case '%':
                     seen_percent = true;
-                    break;
-                case '\\':
-                    seen_slash = true;
                     break;
                 default:
                     putchar(*c);
