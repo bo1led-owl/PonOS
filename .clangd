@@ -1,5 +1,5 @@
 CompileFlags:
-  Add: [-Wall, -Wextra, -Wcovered-switch-default]
+  Add: [-Wall, -Wextra, -Wcovered-switch-default, -ffreestanding, -m32, -DKERNEL_SIZE_KB]
 
 ---
 

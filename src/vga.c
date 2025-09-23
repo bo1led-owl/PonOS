@@ -1,0 +1,235 @@
+#include "vga.h"
+
+#include "assert.h"
+#include "mem.h"
+#include "panic.h"
+
+typedef u16 VgaChar;
+
+static VgaChar vgaChar(Color bg, Color fg, char c) {
+    return (bg << 12) | (fg << 8) | ((u8)c & 0xFF);
+}
+
+constexpr usize COLUMNS = 80;
+constexpr usize ROWS = 25;
+static VgaChar* main_buffer = (VgaChar*)0xB8000;
+
+typedef struct Window {
+    VgaChar* buffer;
+    Color bg, fg;
+    usize x, y;
+    usize rows, columns;
+} Window;
+
+constexpr usize MAX_WINDOWS = 32;
+static bool initialized = false;
+static Window windows[MAX_WINDOWS] = {};
+static usize n_windows = 0;
+
+static Window mw = (Window){
+    .bg = Color_Black,
+    .fg = Color_White,
+    .buffer = (VgaChar*)0xB8000,
+    .rows = ROWS,
+    .columns = COLUMNS,
+    .x = 0,
+    .y = 0,
+};
+
+WindowHandle mainWindow() {
+    return &mw;
+}
+
+static void putcharRaw(WindowHandle w, char c, usize x, usize y) {
+    *(w->buffer + y * COLUMNS + x) = vgaChar(w->bg, w->fg, c);
+}
+
+static void scroll(WindowHandle w) {
+    for (usize i = 1; i < w->rows; ++i) {
+        memcpy(w->buffer + COLUMNS * (i - 1), w->buffer + COLUMNS * i, w->columns * sizeof(VgaChar));
+    }
+
+    for (usize i = 0; i < w->columns; ++i) {
+        putcharRaw(w, 0, i, w->rows - 1);
+    }
+}
+
+void clearWindow(WindowHandle w) {
+    for (usize i = 0; i < w->rows; ++i) {
+        for (usize j = 0; j < w->columns; ++j) {
+            putcharRaw(w, 0, j, i);
+        }
+    }
+    w->x = w->y = 0;
+}
+
+void initScreen() {
+    for (usize i = 0; i < n_windows; ++i) {
+        clearWindow(windows + i);
+    }
+    initialized = true;
+}
+
+WindowHandle addWindow(usize start_x, usize start_y, usize rows, usize columns) {
+    assert(!initialized && "All windows must be added before `initScreen` is called");
+    assert(n_windows < MAX_WINDOWS);
+    WindowHandle res = &windows[n_windows++];
+    *res = (Window){
+        .buffer = main_buffer + start_y * COLUMNS + start_x,
+        .columns = columns,
+        .rows = rows,
+        .bg = Color_Black,
+        .fg = Color_White,
+        .x = 0,
+        .y = 0,
+    };
+    return res;
+}
+
+void setBgColor(WindowHandle w, Color c) {
+    w->bg = c;
+}
+
+void setFgColor(WindowHandle w, Color c) {
+    w->fg = c;
+}
+
+static void fixScreen(WindowHandle w) {
+    if (w->x >= w->columns) {
+        w->y += 1;
+        w->x = 0;
+    }
+
+    while (w->y >= w->rows) {
+        scroll(w);
+        w->y -= 1;
+    }
+}
+
+void putchar(WindowHandle w, char c) {
+    if (c == '\n') {
+        w->y += 1;
+        w->x = 0;
+    } else if (c == '\r') {
+        w->x = 0;
+        return;
+    } else {
+        putcharRaw(w, c, w->x, w->y);
+        w->x += 1;
+    }
+    fixScreen(w);
+}
+
+static void printString(WindowHandle w, const char* s) {
+    for (const char* c = s; *c; ++c) {
+        putchar(w, *c);
+    }
+}
+
+static void printUnsigned(WindowHandle w, u32 n, u8 radix) {
+    assert(radix > 1);
+
+    if (n == 0) {
+        putchar(w, '0');
+        return;
+    }
+
+    // worst case is binary, when we put a char for each of 32 bits
+    char buf[33];
+
+    usize i = 0;
+    while (n > 0) {
+        u32 digit = n % radix;
+        char formatted_digit = (digit < 10) ? '0' + digit : 'a' + (digit - 10);
+        buf[i] = formatted_digit;
+        i += 1;
+        n /= radix;
+    }
+
+    assert(i < 33);
+    buf[i] = 0;
+
+    for (usize j = 0; j < i / 2; ++j) {
+        char tmp = buf[j];
+        buf[j] = buf[i - j - 1];
+        buf[i - j - 1] = tmp;
+    }
+
+    printString(w, buf);
+}
+
+static void printSigned(WindowHandle w, i32 n, u8 radix) {
+    if (n < 0) {
+        putchar(w, '-');
+        n *= -1;
+    }
+
+    printUnsigned(w, n, radix);
+}
+
+void vprintf(WindowHandle w, const char* fmt, va_list args) {
+    bool seen_percent = false;
+    for (const char* c = fmt; *c; ++c) {
+        if (seen_percent) {
+            switch (*c) {
+                case 'd': {
+                    i32 n = va_arg(args, i32);
+                    printSigned(w, n, 10);
+                    break;
+                }
+                case 'u': {
+                    u32 n = va_arg(args, u32);
+                    printUnsigned(w, n, 10);
+                    break;
+                }
+                case 'b': {
+                    u32 n = va_arg(args, u32);
+                    printUnsigned(w, n, 2);
+                    break;
+                }
+                case 'x': {
+                    u32 n = va_arg(args, u32);
+                    printUnsigned(w, n, 16);
+                    break;
+                }
+                case 'c': {
+                    char c = va_arg(args, int);
+                    putchar(w, c);
+                    break;
+                }
+                case 'p': {
+                    void* n = va_arg(args, void*);
+                    printUnsigned(w, (usize)n, 16);
+                    break;
+                }
+                case 's': {
+                    const char* s = va_arg(args, const char*);
+                    printString(w, s);
+                    break;
+                }
+                case '%':
+                    putchar(w, '%');
+                    break;
+                default:
+                    panic("unknown type specifier %c\n", *c);
+            }
+            seen_percent = false;
+        } else {
+            switch (*c) {
+                case '%':
+                    seen_percent = true;
+                    break;
+                default:
+                    putchar(w, *c);
+                    break;
+            }
+        }
+    }
+    va_end(args);
+}
+
+void printf(WindowHandle w, const char* fmt, ...) {
+    va_list args;
+    va_start(args);
+    vprintf(w, fmt, args);
+}

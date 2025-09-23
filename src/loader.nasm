@@ -20,16 +20,15 @@ xor dh, dh ; header number   = 0
 xor ch, ch ; cylinder number = 0
 mov cl, 2  ; sector number   = 2 (to skip the first sector)
 
-mov al, 1
-mov si, (KERNEL_SIZE_KB * 2) ; sectors to load
+mov si, (KERNEL_SIZE_KB * 2 - 1) ; sectors to load
 
 readLoop:
-    mov ah, 2
+    mov ax, 0x0201
     int 0x13 ; read
     jc handleErr
-    
+
     mov di, es
-    add di, 0x40 ; move dest
+    add di, 0x20 ; move dest
     mov es, di
 
     add cl, 1 ; next sector
@@ -46,6 +45,11 @@ readLoop:
 .continueReading:
     sub si, 1
     jnz readLoop
+
+; disable cursor
+mov ah, 1
+mov ch,0x3F
+int 0x10
 
 ; going into 32 bit mode
 lgdt [gdt_descriptor]
@@ -77,6 +81,11 @@ end:
 global infiniteLoop
 infiniteLoop:
     jmp infiniteLoop
+
+global cli
+cli:
+    cli
+    ret
 
 bits 16
 handleErr:
