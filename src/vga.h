@@ -25,16 +25,16 @@ typedef enum : u8 {
 
 struct Window;
 typedef struct Window* WindowHandle;
-constexpr usize MAX_WINDOWS = 32;
 
+/// Add a new window to pool. This must be called before `initScreen`.
+/// Returns a handle to the new window.
 WindowHandle addWindow(usize start_x, usize start_y, usize rows, usize columns);
 
-/// Initialize VGA screen with a single fullscreen window.
+/// Initialize all windows on screen.
 void initScreen();
 WindowHandle mainWindow();
 
-/// Clear window.
-void clear(WindowHandle w);
+void clearWindow(WindowHandle w);
 
 void setBgColor(WindowHandle w, Color c);
 void setFgColor(WindowHandle w, Color c);

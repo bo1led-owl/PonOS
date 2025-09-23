@@ -30,6 +30,9 @@ void* mallocImmortal(usize size, usize alignment) {
 
 void* callocImmortal(usize size, usize alignment) {
     void* res = mallocImmortal(size, alignment);
+    if (res == nullptr) {
+        return nullptr;
+    }
     memzero(res, size);
     return res;
 }

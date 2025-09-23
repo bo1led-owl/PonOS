@@ -21,6 +21,8 @@ typedef struct Window {
     usize rows, columns;
 } Window;
 
+constexpr usize MAX_WINDOWS = 32;
+static bool initialized = false;
 static Window windows[MAX_WINDOWS] = {};
 static usize n_windows = 0;
 
@@ -52,7 +54,7 @@ static void scroll(WindowHandle w) {
     }
 }
 
-void clear(WindowHandle w) {
+void clearWindow(WindowHandle w) {
     for (usize i = 0; i < w->rows; ++i) {
         for (usize j = 0; j < w->columns; ++j) {
             putcharRaw(w, 0, j, i);
@@ -63,11 +65,14 @@ void clear(WindowHandle w) {
 
 void initScreen() {
     for (usize i = 0; i < n_windows; ++i) {
-        clear(windows + i);
+        clearWindow(windows + i);
     }
+    initialized = true;
 }
 
 WindowHandle addWindow(usize start_x, usize start_y, usize rows, usize columns) {
+    assert(!initialized && "All windows must be added before `initScreen` is called");
+    assert(n_windows < MAX_WINDOWS);
     WindowHandle res = &windows[n_windows++];
     *res = (Window){
         .buffer = main_buffer + start_y * COLUMNS + start_x,
@@ -105,15 +110,13 @@ void putchar(WindowHandle w, char c) {
     if (c == '\n') {
         w->y += 1;
         w->x = 0;
-        fixScreen(w);
-        return;
     } else if (c == '\r') {
         w->x = 0;
         return;
+    } else {
+        putcharRaw(w, c, w->x, w->y);
+        w->x += 1;
     }
-
-    putcharRaw(w, c, w->x, w->y);
-    w->x += 1;
     fixScreen(w);
 }
 

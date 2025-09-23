@@ -9,7 +9,7 @@
     // идея с синим экраном честно украдена у @EugeneKornev
     setBgColor(w, Color_Blue);
     setFgColor(w, Color_White);
-    clear(w);
+    clearWindow(w);
     printf(w, "panic: ");
     vprintf(w, fmt, args);
     infiniteLoop();
