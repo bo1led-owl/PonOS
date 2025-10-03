@@ -87,6 +87,49 @@ cli:
     cli
     ret
 
+global lidt
+lidt:
+    mov eax, dword [esp + 4]
+    lidt [eax]
+    ret
+
+extern universalHandler
+global collectCtx
+collectCtx:
+    push ds
+    push es
+    push fs
+    push gs
+    pusha
+
+    ; clear D flag
+    cld
+
+    ; reset segment registers
+    mov eax, DATA_SEGMENT
+    mov ds, eax
+    mov es, eax
+    mov fs, eax
+    mov gs, eax
+
+    ; align stack
+    mov ebx, esp
+    mov eax, 12
+    mov ecx, esp
+    and ecx, 0xF
+    sub eax, ecx
+    sub esp, eax
+
+    push ebx
+    call universalHandler
+    mov esp, ebx
+    popa
+    pop gs
+    pop fs
+    pop es
+    pop ds
+    iret
+
 bits 16
 handleErr:
     mov ah, 0x0E

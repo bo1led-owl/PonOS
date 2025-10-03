@@ -3,9 +3,10 @@
 #include "mem.h"
 #include "panic.h"
 
-constexpr usize ARENA_END = 0x80000;
+constexpr usize ARENA_START = 0x100000;
+constexpr usize ARENA_END = 0x400000;
 
-static u8* cur = (u8*)(0x7C00 + (KERNEL_SIZE_KB) * 1024);
+static u8* cur = (u8*)ARENA_START;
 
 void* mallocImmortal(usize size, usize alignment) {
     if (size == 0) {
