@@ -61,7 +61,8 @@ static void* genTrampolines() {
         trampoline[offset++] = 0x6A;
         trampoline[offset++] = vector;
         // jmp collectCtx
-        u32 offsetToCollectCtx = (u32)collectCtx - (u32)(trampoline + offset + 5);  // +5 to account for the `jmp` size
+        // +5 to account for the `jmp` size
+        u32 offsetToCollectCtx = (u32)collectCtx - (u32)(trampoline + offset + 5);
         trampoline[offset++] = 0xE9;
         trampoline[offset++] = offsetToCollectCtx & 0xFF;
         trampoline[offset++] = (offsetToCollectCtx >> 8) & 0xFF;
@@ -125,6 +126,6 @@ void universalHandler(const InterruptCtx* ctx) {
         "  gs: 0x%x\n"
         "error code: 0x%x\n\n"
         "eflags: 0x%x",
-        ctx->vector, ctx->cs, ctx->eip, ctx->eax, ctx->ecx, ctx->edx, ctx->ebx, ctx->esp, ctx->ebp, ctx->esi, ctx->edi,
-        ctx->ds, ctx->es, ctx->fs, ctx->gs, ctx->errorCode, ctx->eflags);
+        ctx->vector, ctx->cs, ctx->eip, ctx->eax, ctx->ecx, ctx->edx, ctx->ebx, ctx->esp, ctx->ebp,
+        ctx->esi, ctx->edi, ctx->ds, ctx->es, ctx->fs, ctx->gs, ctx->errorCode, ctx->eflags);
 }

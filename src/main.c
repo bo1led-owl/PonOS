@@ -14,8 +14,8 @@
     SETUP_REGISTERS;             \
     __asm__ volatile("idiv eax\n");
 
-#define syscallExperiment       \
-    SETUP_REGISTERS;            \
+#define syscallExperiment \
+    SETUP_REGISTERS;      \
     __asm__ volatile("int 42\n");
 
 #define ioExperiment \
