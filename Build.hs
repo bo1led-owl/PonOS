@@ -24,6 +24,7 @@ clangFlags =
   [ "-Wall",
     "-Wextra",
     "-Wpedantic",
+    "-masm=intel",
     "-std=c23",
     "-m32",
     "-ffreestanding",
