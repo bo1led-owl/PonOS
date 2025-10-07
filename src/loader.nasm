@@ -52,7 +52,7 @@ mov ch,0x3F
 int 0x10
 
 ; going into 32 bit mode
-lgdt [gdt_descriptor]
+lgdt [gdtDescriptor]
 cld
 
 mov eax, cr0
@@ -145,7 +145,7 @@ handleErr:
 
 errMsg: db "Error reading from disk", 0
 
-gdt_descriptor:
+gdtDescriptor:
   dw 0x17
   dd gdt
 

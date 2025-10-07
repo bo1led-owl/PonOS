@@ -12,7 +12,7 @@ static VgaChar vgaChar(Color bg, Color fg, char c) {
 
 constexpr usize COLUMNS = 80;
 constexpr usize ROWS = 25;
-static VgaChar* main_buffer = (VgaChar*)0xB8000;
+static VgaChar* mainBuffer = (VgaChar*)0xB8000;
 
 typedef struct Window {
     VgaChar* buffer;
@@ -24,7 +24,7 @@ typedef struct Window {
 constexpr usize MAX_WINDOWS = 32;
 static bool initialized = false;
 static Window windows[MAX_WINDOWS] = {};
-static usize n_windows = 0;
+static usize nWindows = 0;
 
 static Window mw = (Window){
     .bg = Color_Black,
@@ -65,18 +65,18 @@ void clearWindow(WindowHandle w) {
 }
 
 void initScreen() {
-    for (usize i = 0; i < n_windows; ++i) {
+    for (usize i = 0; i < nWindows; ++i) {
         clearWindow(windows + i);
     }
     initialized = true;
 }
 
-WindowHandle addWindow(usize start_x, usize start_y, usize rows, usize columns) {
+WindowHandle addWindow(usize startX, usize startY, usize rows, usize columns) {
     assert(!initialized && "All windows must be added before `initScreen` is called");
-    assert(n_windows < MAX_WINDOWS);
-    WindowHandle res = &windows[n_windows++];
+    assert(nWindows < MAX_WINDOWS);
+    WindowHandle res = &windows[nWindows++];
     *res = (Window){
-        .buffer = main_buffer + start_y * COLUMNS + start_x,
+        .buffer = mainBuffer + startY * COLUMNS + startX,
         .columns = columns,
         .rows = rows,
         .bg = Color_Black,
@@ -141,8 +141,8 @@ static void printUnsigned(WindowHandle w, u32 n, u8 radix) {
     usize i = 0;
     while (n > 0) {
         u32 digit = n % radix;
-        char formatted_digit = (digit < 10) ? '0' + digit : 'a' + (digit - 10);
-        buf[i] = formatted_digit;
+        char formattedDigit = (digit < 10) ? '0' + digit : 'a' + (digit - 10);
+        buf[i] = formattedDigit;
         i += 1;
         n /= radix;
     }
@@ -169,9 +169,9 @@ static void printSigned(WindowHandle w, i32 n, u8 radix) {
 }
 
 void vprintf(WindowHandle w, const char* fmt, va_list args) {
-    bool seen_percent = false;
+    bool seenPercent = false;
     for (const char* c = fmt; *c; ++c) {
-        if (seen_percent) {
+        if (seenPercent) {
             switch (*c) {
                 case 'd': {
                     i32 n = va_arg(args, i32);
@@ -214,11 +214,11 @@ void vprintf(WindowHandle w, const char* fmt, va_list args) {
                 default:
                     panic("unknown type specifier %c\n", *c);
             }
-            seen_percent = false;
+            seenPercent = false;
         } else {
             switch (*c) {
                 case '%':
-                    seen_percent = true;
+                    seenPercent = true;
                     break;
                 default:
                     putchar(w, *c);
