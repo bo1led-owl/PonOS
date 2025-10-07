@@ -5,6 +5,7 @@ import Control.Exception (IOException, catch)
 import Control.Monad.Extra
 import Data.Functor
 import Data.Time (UTCTime)
+import Data.Tuple.Extra
 import Options.Applicative
 import System.Directory
 import System.FilePath
@@ -17,8 +18,8 @@ clang mode input = do
   runProcess
     "clang"
     ( modeToFlags mode
-        <> clangFlags
-        <> [input, "-o", output]
+        ++ clangFlags
+        ++ [input, "-o", output]
     )
   pure output
 
@@ -43,7 +44,7 @@ buildKernel mode = do
     kernelElf = outdirByMode mode </> "kernel.elf"
     kernelBin = outdirByMode mode </> "kernel.bin"
     ld :: FilePath -> [FilePath] -> IO ()
-    ld output objs = runProcess "ld.lld" (["-e", "kernelEntry", "-T", "link.ld", "-o", output] <> objs)
+    ld output objs = runProcess "ld.lld" (["-e", "kernelEntry", "-T", "link.ld", "-o", output] ++ objs)
 
 shouldRebuild :: Mode -> IO Bool
 shouldRebuild mode = do
@@ -56,34 +57,21 @@ shouldRebuild mode = do
   where
     imgFile = imgFileByMode mode
 
-buildImg :: Mode -> IO FilePath
-buildImg mode = do
-  whenM
-    (shouldRebuild mode)
-    $ do
+buildImg :: Mode -> IO (Either String FilePath)
+buildImg mode = ifM (shouldRebuild mode) makeImg (pure $ Right imgFile)
+  where
+    makeImg = do
       createDirectoryIfMissing True (outdirByMode mode)
       kernelFile <- buildKernel mode
-      checkSize kernelFile
+      ifM
+        (checkSize kernelFile)
+        (dd kernelFile $> Right imgFile)
+        (pure $ Left "Kernel is too big, aborting compilation")
+    dd kernelFile = do
       runProcess "dd" ["if=/dev/zero", "of=" ++ imgFile, "bs=1024", "count=1440"]
       runProcess "dd" ["if=" ++ kernelFile, "of=" ++ imgFile, "conv=notrunc"]
-  pure imgFile
-  where
-    checkSize kernelFile = do
-      sz <- getFileSizeKb kernelFile
-      when
-        (sz >= kernelSizeKb || (kernelSizeKb - sz < 5))
-        ( putStrLn $
-            "\nWARNING: Kernel is close to upper limit: currently " ++ show sz ++ " KiB\n"
-        )
+    checkSize = fmap (< kernelSizeKb) . getFileSizeKb
     imgFile = imgFileByMode mode
-
-run :: FilePath -> IO ()
-run = runProcess "qemu-system-i386" . qemuFlags
-
-debug :: FilePath -> IO ()
-debug img = do
-  runProcess' "qemu-system-i386" (qemuFlags img <> ["-s", "-S"])
-  runProcess "lldb" ["--local-lldbinit"]
 
 data Command
   = Build Mode
@@ -91,26 +79,34 @@ data Command
   | Debug Mode
   | Clean
 
-buildMode :: Parser Mode
-buildMode = flag Release Dev (long "dev" <> help "Build in dev mode")
-
 args :: ParserInfo Command
 args = info (parseCommands <**> helper) fullDesc
   where
+    buildMode = flag Release Dev (long "dev" <> help "Build in dev mode")
     parseCommands =
-      hsubparser $
-        mconcat
-          [ command "build" (info (Build <$> buildMode) (progDesc "Build kernel image")),
-            command "run" (info (Run <$> buildMode) (progDesc "Run kernel")),
-            command "debug" (info (Debug <$> buildMode) (progDesc "Debug kernel")),
-            command "clean" (info (pure Clean) (progDesc "Clean all produced binaries"))
-          ]
+      (hsubparser . mconcat . map (uncurry3 $ \n c d -> command n (info c (progDesc d))))
+        [ ("build", Build <$> buildMode, "Build kernel image"),
+          ("run", Run <$> buildMode, "Run kernel"),
+          ("debug", Debug <$> buildMode, "Debug kernel"),
+          ("clean", pure Clean, "Clean all produced binaries")
+        ]
 
 main :: IO ()
 main = do
   cmd <- execParser args
   case cmd of
-    Build m -> buildImg m $> ()
-    Run m -> buildImg m >>= run
-    Debug m -> buildImg m >>= debug
+    Build m -> runIfBuildSucceedes (const $ pure ()) m
+    Run m -> run m
+    Debug m -> debug m
     Clean -> removeDirectoryRecursive outdir
+
+runIfBuildSucceedes :: (FilePath -> IO ()) -> Mode -> IO ()
+runIfBuildSucceedes f m = buildImg m >>= either putStrLn f
+
+run :: Mode -> IO ()
+run = runIfBuildSucceedes $ runProcess "qemu-system-i386" . qemuFlags
+
+debug :: Mode -> IO ()
+debug = runIfBuildSucceedes $ \img -> do
+  runProcess' "qemu-system-i386" (qemuFlags img ++ ["-s", "-S"])
+  runProcess "lldb" ["--local-lldbinit"]
