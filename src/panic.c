@@ -1,6 +1,6 @@
 #include "panic.h"
 
-#include "utils.h"
+#include "asmUtils.h"
 #include "vga.h"
 
 [[noreturn]] void vpanic(const char* fmt, va_list args) {
