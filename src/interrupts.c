@@ -2,6 +2,7 @@
 
 #include "alloc.h"
 #include "asmUtils.h"
+#include "assert.h"
 #include "panic.h"
 
 void collectCtx();
@@ -64,17 +65,15 @@ static void* genTrampolines() {
         // +5 to account for the `jmp` size
         u32 offsetToCollectCtx = (u32)collectCtx - (u32)(trampoline + offset + 5);
         trampoline[offset++] = 0xE9;
-        trampoline[offset++] = offsetToCollectCtx & 0xFF;
-        trampoline[offset++] = (offsetToCollectCtx >> 8) & 0xFF;
-        trampoline[offset++] = (offsetToCollectCtx >> 16) & 0xFF;
-        trampoline[offset++] = (offsetToCollectCtx >> 24) & 0xFF;
+        *(u32*)(trampoline + offset) = offsetToCollectCtx;
+        offset += 4;
+        assert(offset <= TRAMPOLINE_SIZE);
     }
 
     return trampolines;
 }
 
-static void* genIdtEntry(const void* trampoline) {
-    IdtEntry* entry = mallocImmortal(sizeof(IdtEntry), sizeof(IdtEntry));
+static void* genIdtEntry(IdtEntry* entry, const void* trampoline) {
     entry->fixed1 = 0;
     entry->fixed2 = 0b01;
     entry->offsetLow = ((usize)trampoline) & 0xFFFF;
@@ -87,14 +86,11 @@ static void* genIdtEntry(const void* trampoline) {
 }
 
 static void* genIdt(const u8* trampolines) {
-    void* idtBase = nullptr;
+    IdtEntry* idtBase = mallocImmortal(sizeof(IdtEntry) * N_VECTORS, sizeof(IdtEntry));
 
     for (u32 vector = 0; vector < N_VECTORS; ++vector) {
         const void* trampoline = trampolines + TRAMPOLINE_SIZE * vector;
-        IdtEntry* entry = genIdtEntry(trampoline);
-        if (idtBase == nullptr) {
-            idtBase = entry;
-        }
+        genIdtEntry(idtBase + vector, trampoline);
     }
 
     return idtBase;
@@ -104,8 +100,8 @@ void setupInterrupts() {
     void* trampolines = genTrampolines();
     void* idt = genIdt(trampolines);
     constexpr u16 idtLimit = N_VECTORS * sizeof(IdtEntry) - 1;
-    u32 idtDesc[2] = {((usize)idt << 16) | idtLimit, (usize)(idt) >> 16};
-    lidt(idtDesc);
+    u64 idtDesc = ((u64)idt << 16) | idtLimit;
+    lidt(&idtDesc);
 }
 
 void universalHandler(const InterruptCtx* ctx) {

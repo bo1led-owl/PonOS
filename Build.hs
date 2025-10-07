@@ -29,7 +29,7 @@ getPrevBuildMode :: IO (Maybe Mode)
 getPrevBuildMode =
   ifM
     (doesFileExist prevBuildModeFile)
-    (parseMode <$> readFile prevBuildModeFile)
+    (parseMode <$> readFile' prevBuildModeFile)
     (pure Nothing)
   where
     parseMode "release" = Just Release

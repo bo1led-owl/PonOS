@@ -128,6 +128,7 @@ collectCtx:
     pop fs
     pop es
     pop ds
+    add esp, 8 ; error code and vector
     iret
 
 bits 16
