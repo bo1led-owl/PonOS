@@ -7,8 +7,9 @@
         "mov ecx, 1\n"  \
         "mov edx, 2\n"  \
         "mov ebx, 3\n"  \
-        "mov esi, 4\n"  \
-        "mov edi, 5\n")
+        "mov ebp, 4\n"  \
+        "mov esi, 5\n"  \
+        "mov edi, 6\n")
 
 #define divisionByZeroExperiment \
     SETUP_REGISTERS;             \

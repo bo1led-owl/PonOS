@@ -1,9 +1,12 @@
+{-# LANGUAGE ImportQualifiedPost #-}
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
-module Build (img, run, debug, dev, release) where
+module Build (img, run, debug, dev, release, clean) where
 
+import Control.Exception (IOException, catch)
 import Control.Monad
-import Data.Traversable (for)
+import Control.Monad.Extra
+import Data.Time (UTCTime)
 import System.Directory
 import System.FilePath
 import System.IO
@@ -15,6 +18,26 @@ srcdir = "src"
 
 outdir :: FilePath
 outdir = "build"
+
+imgFile :: FilePath
+imgFile = outdir </> "boot.img"
+
+prevBuildModeFile :: FilePath
+prevBuildModeFile = outdir </> "mode"
+
+getPrevBuildMode :: IO (Maybe Mode)
+getPrevBuildMode =
+  ifM
+    (doesFileExist prevBuildModeFile)
+    (parseMode <$> readFile prevBuildModeFile)
+    (pure Nothing)
+  where
+    parseMode "release" = Just Release
+    parseMode "dev" = Just Dev
+    parseMode _ = Nothing
+
+sources :: IO [FilePath]
+sources = listSourceFiles [".c", ".h", ".nasm"]
 
 kernelSizeKb :: Integer
 kernelSizeKb = 20
@@ -36,8 +59,8 @@ clangFlags =
     "-c"
   ]
 
-qemuFlags :: FilePath -> Args
-qemuFlags imgFile =
+qemuFlags :: Args
+qemuFlags =
   [ "-cpu",
     "pentium2",
     "-m",
@@ -52,7 +75,11 @@ qemuFlags imgFile =
 
 type Args = [String]
 
-data Mode = Dev | Release
+data Mode = Dev | Release deriving (Eq)
+
+instance Show Mode where
+  show Dev = "dev"
+  show Release = "release"
 
 modeToFlags :: Mode -> Args
 modeToFlags Dev = ["-O0"]
@@ -90,56 +117,78 @@ buildLoader = do
   runProcess "nasm" ["-felf32", "-dKERNEL_SIZE_KB=" ++ show kernelSizeKb, input, "-o", output]
   pure output
 
+listCFiles :: IO [FilePath]
+listCFiles = listSourceFiles [".c"]
+
+listSourceFiles :: [String] -> IO [FilePath]
+listSourceFiles extensions =
+  map (srcdir </>)
+    . filter (\f -> any (`isExtensionOf` f) extensions)
+    <$> listDirectory srcdir
+
 buildC :: Mode -> IO [FilePath]
-buildC mode = do
-  srcFiles <- map (srcdir </>) . filter (".c" `isExtensionOf`) <$> listDirectory srcdir
-  for srcFiles (clang mode)
+buildC mode = listCFiles >>= traverse (clang mode)
 
 getFileSizeKb :: FilePath -> IO Integer
-getFileSizeKb path = withFile path ReadMode (fmap toKiB . hFileSize)
+getFileSizeKb path = withFile path ReadMode (fmap toKiBRoundedUp . hFileSize)
   where
-    toKiB n = n `div` 1024 + (if n `mod` 1024 /= 0 then 1 else 0)
+    toKiBRoundedUp n = n `div` 1024 + (if n `mod` 1024 /= 0 then 1 else 0)
 
 buildKernel :: Mode -> IO FilePath
 buildKernel mode = do
-  let kernelElf = outdir </> "kernel.elf"
-  let kernelBin = outdir </> "kernel.bin"
   loaderO <- buildLoader
   objs <- (loaderO :) <$> buildC mode
   ld kernelElf objs
   runProcess "objcopy" ["-I", "elf32-i386", "-O", "binary", kernelElf, kernelBin]
   pure kernelBin
   where
+    kernelElf = outdir </> "kernel.elf"
+    kernelBin = outdir </> "kernel.bin"
     ld :: FilePath -> [FilePath] -> IO ()
     ld output objs = runProcess "ld.lld" (["-e", "kernelEntry", "-T", "link.ld", "-o", output] <> objs)
 
-img :: Mode -> IO FilePath
-img mode = do
-  doesDirectoryExist outdir >>= flip unless (createDirectory outdir)
-  kernelFile <- buildKernel mode
-  getFileSizeKb kernelFile
-    >>= ( \sz ->
-            when
-              (sz >= kernelSizeKb || (kernelSizeKb - sz < 5))
-              (putStrLn $ "\nWARNING: Kernel is close to upper limit: currently " ++ show sz ++ " KiB\n")
-        )
-  let imgFile = outdir </> "boot.img"
-  runProcess "dd" ["if=/dev/zero", "of=" ++ imgFile, "bs=1024", "count=1440"]
-  runProcess "dd" ["if=" ++ kernelFile, "of=" ++ imgFile, "conv=notrunc"]
-  pure imgFile
+shouldRebuild :: Mode -> IO Bool
+shouldRebuild mode = do
+  imgModTime <-
+    catch
+      (Just <$> getModificationTime imgFile)
+      ((const $ pure Nothing) :: IOException -> IO (Maybe UTCTime))
+  sourcesModTimes <- sources >>= traverse getModificationTime
+  let anySourceChanged = maybe True (\mt -> any (> mt) sourcesModTimes) imgModTime
+  prevBuildMode <- getPrevBuildMode
+  pure (anySourceChanged || maybe False (mode /=) prevBuildMode)
 
-dev :: IO FilePath
+img :: Mode -> IO ()
+img mode = ifM (shouldRebuild mode) (compile *> saveMode) (pure ())
+  where
+    checkSize kernelFile = do
+      sz <- getFileSizeKb kernelFile
+      when
+        (sz >= kernelSizeKb || (kernelSizeKb - sz < 5))
+        ( putStrLn $
+            "\nWARNING: Kernel is close to upper limit: currently " ++ show sz ++ " KiB\n"
+        )
+    compile = do
+      unlessM (doesDirectoryExist outdir) (createDirectory outdir)
+      kernelFile <- buildKernel mode
+      checkSize kernelFile
+      runProcess "dd" ["if=/dev/zero", "of=" ++ imgFile, "bs=1024", "count=1440"]
+      runProcess "dd" ["if=" ++ kernelFile, "of=" ++ imgFile, "conv=notrunc"]
+      pure imgFile
+    saveMode = writeFile prevBuildModeFile (show mode)
+
+dev :: IO ()
 dev = img Dev
 
-release :: IO FilePath
+release :: IO ()
 release = img Release
 
-run :: FilePath -> IO ()
-run = runProcess "qemu-system-i386" . qemuFlags
+run :: IO ()
+run = runProcess "qemu-system-i386" qemuFlags
 
-debug :: FilePath -> IO ()
-debug imgFile = do
-  runProcess' "qemu-system-i386" (qemuFlags imgFile <> ["-s", "-S"])
+debug :: IO ()
+debug = do
+  runProcess' "qemu-system-i386" (qemuFlags <> ["-s", "-S"])
   runProcess "lldb" ["--local-lldbinit"]
 
 clean :: IO ()
