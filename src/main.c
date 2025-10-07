@@ -28,7 +28,7 @@
 
     // divisionByZeroExperiment
     // syscallExperiment
-    ioExperiment
+    // ioExperiment
 
     infiniteLoop();
 }

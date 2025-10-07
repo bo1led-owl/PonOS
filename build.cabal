@@ -8,8 +8,9 @@ common warnings
 
 executable main
     import: warnings
-    main-is: Build.hs
-    other-modules:
-    build-depends: base, extra, process, filepath, directory, time
+    main-is: Main.hs
+    other-modules: Config, Utils
+    build-depends: base, extra, process, filepath, directory, time, optparse-applicative
+    hs-source-dirs: buildsystem
     default-language: Haskell2010
 

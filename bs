@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+cabal run -O2 build -- $@
