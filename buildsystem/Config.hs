@@ -1,17 +1,14 @@
 module Config where
 
 import System.FilePath
-import Utils
 
-data Mode = Dev | Release deriving (Eq)
+data Mode = Dev | Release
+
+data Config = Config {buildMode :: Mode, enableAsserts :: Bool}
 
 instance Show Mode where
   show Dev = "dev"
   show Release = "release"
-
-modeToFlags :: Mode -> [String]
-modeToFlags Dev = ["-O0"]
-modeToFlags Release = ["-O2", "-DNDEBUG"]
 
 srcdir :: FilePath
 srcdir = "src"
@@ -19,28 +16,35 @@ srcdir = "src"
 outdir :: FilePath
 outdir = "build"
 
-outdirByMode :: Mode -> FilePath
-outdirByMode mode = outdir </> show mode
+outdirByConfig :: Config -> FilePath
+outdirByConfig (Config mode asserts) = outdir </> show mode </> (if asserts then "assert" else "noassert")
 
 kernelSizeKb :: Integer
 kernelSizeKb = 20
 
-clangFlags :: [String]
-clangFlags =
-  [ "-Wall",
-    "-Wextra",
-    "-Wpedantic",
-    "-masm=intel",
-    "-std=c23",
-    "-m32",
-    "-ffreestanding",
-    "-fno-pie",
-    "-mno-sse",
-    "-mno-mmx",
-    "-fno-stack-protector",
-    "-DKERNEL_SIZE_KB=" ++ show kernelSizeKb,
-    "-c"
-  ]
+clangFlags :: Config -> [String]
+clangFlags (Config mode asserts) = prependIf "-DNDEBUG" flags (not asserts)
+  where
+    flags =
+      [ "-Wall",
+        "-Wextra",
+        "-Wpedantic",
+        "-masm=intel",
+        "-std=c23",
+        "-m32",
+        "-ffreestanding",
+        "-fno-pie",
+        "-mno-sse",
+        "-mno-mmx",
+        "-fno-stack-protector",
+        "-DKERNEL_SIZE_KB=" ++ show kernelSizeKb,
+        case mode of
+          Dev -> "-O0"
+          Release -> "-O2"
+      ]
+    prependIf :: a -> [a] -> Bool -> [a]
+    prependIf x xs True = x : xs
+    prependIf _ xs False = xs
 
 qemuFlags :: FilePath -> [String]
 qemuFlags img =
@@ -56,8 +60,5 @@ qemuFlags img =
     "file=" ++ img ++ ",format=raw,if=floppy"
   ]
 
-imgFileByMode :: Mode -> FilePath
-imgFileByMode mode = outdirByMode mode </> "boot.img"
-
-sources :: IO [FilePath]
-sources = getFilesWithExtensions srcdir [".c", ".h", ".nasm"]
+imgFileByConfig :: Config -> FilePath
+imgFileByConfig config = outdirByConfig config </> "boot.img"
