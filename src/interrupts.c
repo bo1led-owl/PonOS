@@ -1,7 +1,6 @@
 #include "interrupts.h"
 
 #include "alloc.h"
-#include "asmUtils.h"
 #include "assert.h"
 #include "panic.h"
 
@@ -101,7 +100,7 @@ void setupInterrupts() {
     void* idt = genIdt(trampolines);
     constexpr u16 idtLimit = N_VECTORS * sizeof(IdtEntry) - 1;
     u64 idtDesc = ((u64)idt << 16) | idtLimit;
-    lidt(&idtDesc);
+    __asm__ volatile("lidt [%0]" ::"r"(&idtDesc));
 }
 
 void universalHandler(const InterruptCtx* ctx) {

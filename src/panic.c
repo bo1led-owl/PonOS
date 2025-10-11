@@ -1,10 +1,10 @@
 #include "panic.h"
 
-#include "asmUtils.h"
+#include "utils.h"
 #include "vga.h"
 
 [[noreturn]] void vpanic(const char* fmt, va_list args) {
-    cli();
+    cli;
     WindowHandle w = mainWindow();
     // идея с синим экраном честно украдена у @EugeneKornev
     setBgColor(w, Color_Blue);

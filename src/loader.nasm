@@ -82,17 +82,6 @@ global infiniteLoop
 infiniteLoop:
     jmp infiniteLoop
 
-global cli
-cli:
-    cli
-    ret
-
-global lidt
-lidt:
-    mov eax, dword [esp + 4]
-    lidt [eax]
-    ret
-
 extern universalHandler
 global collectCtx
 collectCtx:
