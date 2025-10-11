@@ -25,7 +25,11 @@ instance (Functor f) => Functor (BuildT f) where
 
 instance (Monad f) => Applicative (BuildT f) where
   pure x = BuildT (const $ (pure . Right) x)
-  f <*> x = BuildT (\c -> runBuildT f c >>= either (pure . Left) (\f -> fmap f <$> runBuildT x c))
+  f <*> x = BuildT $ \c ->
+    runBuildT f c
+      >>= either
+        (pure . Left)
+        (\f -> fmap f <$> runBuildT x c)
 
 instance (Monad m) => Monad (BuildT m) where
   m >>= g =
