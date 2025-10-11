@@ -26,7 +26,7 @@ args = info (parseCommands <**> helper) fullDesc
     config =
       Config
         <$> flag Release Dev (short 'd' <> long "dev" <> help "Build without optimizations")
-        <*> flag False True (short 'n' <> long "noassert" <> help "Disable assertions")
+        <*> flag True False (short 'n' <> long "noassert" <> help "Disable assertions")
     parseCommands =
       (hsubparser . mconcat . map (uncurry3 $ \n c d -> command n (info c (progDesc d))))
         [ ("build", Build <$> config, "Build kernel image"),
