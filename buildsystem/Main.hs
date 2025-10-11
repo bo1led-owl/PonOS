@@ -56,5 +56,5 @@ run = do
 debug :: Build ()
 debug = do
   img <- getFromConfig imgFileByConfig
-  lift $ runProcess' "qemu-system-i386" (qemuFlags img ++ ["-s", "-S"])
+  lift $ runProcessBackground "qemu-system-i386" (qemuFlags img ++ ["-s", "-S"])
   runProcess "lldb" ["--local-lldbinit"]

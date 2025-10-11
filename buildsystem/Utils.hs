@@ -12,23 +12,33 @@ import System.Directory
 import System.Exit
 import System.FilePath
 import System.IO
-import System.Process (createProcess, proc, waitForProcess)
-import System.Process qualified as SP (runProcess)
+import System.Process qualified as SP (runProcess, waitForProcess)
 
 runProcess :: FilePath -> [String] -> Build ()
 runProcess name args = do
-  let process = proc name args
-  (_, _, _, handle) <- lift $ createProcess process
-  exitCode <- lift $ waitForProcess handle
+  handle <- lift $ SP.runProcess name args Nothing Nothing Nothing Nothing Nothing
+  exitCode <- lift $ SP.waitForProcess handle
   case exitCode of
     ExitSuccess -> pure ()
     ExitFailure n -> throwError $ "Error: `" ++ name ++ "` exited with code " ++ show n
 
-runProcess' :: FilePath -> [String] -> IO ()
-runProcess' name args = do
-  nullHandle <- Just <$> openFile "/dev/null" ReadWriteMode
-  SP.runProcess name args Nothing Nothing nullHandle nullHandle nullHandle
+runProcessSilent :: FilePath -> [String] -> Build ()
+runProcessSilent name args = do
+  out <- lift $ Just <$> nullHandle
+  handle <- lift $ SP.runProcess name args Nothing Nothing Nothing out out
+  exitCode <- lift $ SP.waitForProcess handle
+  case exitCode of
+    ExitSuccess -> pure ()
+    ExitFailure n -> throwError $ "Error: `" ++ name ++ "` exited with code " ++ show n
+
+runProcessBackground :: FilePath -> [String] -> IO ()
+runProcessBackground name args = do
+  nh <- Just <$> nullHandle
+  SP.runProcess name args Nothing Nothing nh nh nh
   pure ()
+
+nullHandle :: IO Handle
+nullHandle = openFile "/dev/null" ReadWriteMode
 
 getFilesWithExtensions :: FilePath -> [String] -> IO [FilePath]
 getFilesWithExtensions dir extensions =
