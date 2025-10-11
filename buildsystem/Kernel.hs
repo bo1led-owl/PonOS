@@ -35,7 +35,6 @@ linkKernel :: Config -> [FilePath] -> Build ()
 linkKernel config objs = do
   ld kernelElf objs
   runProcess "objcopy" ["-I", "elf32-i386", "-O", "binary", kernelElf, kernelBin config]
-  pure ()
   where
     kernelElf = outdirByConfig config </> "kernel.elf"
 

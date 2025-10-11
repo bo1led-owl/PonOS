@@ -29,7 +29,6 @@ dd :: FilePath -> FilePath -> Build ()
 dd kernelFile imgFile = do
   runProcess "dd" ["if=/dev/zero", "of=" ++ imgFile, "bs=1024", "count=1440"]
   runProcess "dd" ["if=" ++ kernelFile, "of=" ++ imgFile, "conv=notrunc"]
-  pure ()
 
 checkSize :: FilePath -> IO Bool
 checkSize = fmap (< kernelSizeKb) . getFileSizeKb

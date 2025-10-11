@@ -6,6 +6,7 @@ module Main where
 import Build
 import Config
 import Control.Monad.Trans
+import Data.Functor
 import Data.Tuple.Extra
 import Image
 import Options.Applicative
@@ -41,9 +42,7 @@ main = do
     Build c -> runBuildT buildImage c
     Run c -> runBuildT (buildImage *> run) c
     Debug c -> runBuildT (buildImage *> debug) c
-    Clean -> do
-      removeDirectoryRecursive outdir
-      pure (Right ())
+    Clean -> removeDirectoryRecursive outdir $> Right ()
   either putStrLn pure res
 
 buildImage :: Build ()
