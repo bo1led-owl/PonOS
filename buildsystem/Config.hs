@@ -51,7 +51,7 @@ qemuFlags img =
   [ "-cpu",
     "pentium2",
     "-m",
-    "4g",
+    "4m",
     "-monitor",
     "stdio",
     "-device",

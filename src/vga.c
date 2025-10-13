@@ -10,8 +10,6 @@ static VgaChar vgaChar(Color bg, Color fg, char c) {
     return (bg << 12) | (fg << 8) | ((u8)c & 0xFF);
 }
 
-constexpr usize COLUMNS = 80;
-constexpr usize ROWS = 25;
 static VgaChar* mainBuffer = (VgaChar*)0xB8000;
 
 typedef struct Window {
@@ -30,8 +28,8 @@ static Window mw = (Window){
     .bg = Color_Black,
     .fg = Color_White,
     .buffer = (VgaChar*)0xB8000,
-    .rows = ROWS,
-    .columns = COLUMNS,
+    .rows = VGA_ROWS,
+    .columns = VGA_COLUMNS,
     .x = 0,
     .y = 0,
 };
@@ -41,12 +39,12 @@ WindowHandle mainWindow() {
 }
 
 static void putcharRaw(WindowHandle w, char c, usize x, usize y) {
-    *(w->buffer + y * COLUMNS + x) = vgaChar(w->bg, w->fg, c);
+    *(w->buffer + y * VGA_COLUMNS + x) = vgaChar(w->bg, w->fg, c);
 }
 
 static void scroll(WindowHandle w) {
     for (usize i = 1; i < w->rows; ++i) {
-        memcpy(w->buffer + COLUMNS * (i - 1), w->buffer + COLUMNS * i,
+        memcpy(w->buffer + VGA_COLUMNS * (i - 1), w->buffer + VGA_COLUMNS * i,
                w->columns * sizeof(VgaChar));
     }
 
@@ -76,7 +74,7 @@ WindowHandle addWindow(usize startX, usize startY, usize rows, usize columns) {
     assert(nWindows < MAX_WINDOWS);
     WindowHandle res = &windows[nWindows++];
     *res = (Window){
-        .buffer = mainBuffer + startY * COLUMNS + startX,
+        .buffer = mainBuffer + startY * VGA_COLUMNS + startX,
         .columns = columns,
         .rows = rows,
         .bg = Color_Black,

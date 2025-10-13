@@ -1,34 +1,50 @@
 #include "interrupts.h"
+#include "portIo.h"
 #include "utils.h"
+#include "vga.h"
 
-#define SETUP_REGISTERS \
-    __asm__ volatile(   \
-        "mov eax, 0\n"  \
-        "mov ecx, 1\n"  \
-        "mov edx, 2\n"  \
-        "mov ebx, 3\n"  \
-        "mov ebp, 4\n"  \
-        "mov esi, 5\n"  \
-        "mov edi, 6\n")
+static WindowHandle w;
+static int globalCounter = 0;
 
-#define divisionByZeroExperiment \
-    SETUP_REGISTERS;             \
-    __asm__ volatile("idiv eax\n");
+constexpr int LIMIT = 42;
 
-#define syscallExperiment \
-    SETUP_REGISTERS;      \
-    __asm__ volatile("int 42\n");
+static void delay() {
+    for (int i = 0; i < 2'500; ++i) {
+        printf(w, "%d\n", i);
+        writeToPort(0x80, 0);
+}
+}
 
-#define ioExperiment \
-    SETUP_REGISTERS; \
-    __asm__ volatile("sti\n");
+static void timerHandler([[maybe_unused]] const InterruptCtx* ctx) {
+    u8 mask = getMasterDeviceMask();
+    mask &= ~ENABLE_TIMER;
+    setMasterDeviceMask(mask);
+
+    delay();
+
+    sti;
+
+    delay();
+}
+
+static void keyboardHandler([[maybe_unused]] const InterruptCtx* ctx) {
+    printf(w, "%u ", readFromPort(0x60));
+    infiniteLoop();
+}
+
+[[noreturn]] void experiment() {
+    setup8259(true);
+    setMasterDeviceMask(ENABLE_TIMER | ENABLE_KEYBOARD);
+    overrideIterruptHandler(TIMER_INTERRUPT_VECTOR, Gate_Interrupt, timerHandler);
+    overrideIterruptHandler(KEYBOARD_INTERRUPT_VECTOR, Gate_Interrupt, keyboardHandler);
+    sti;
+    infiniteLoop();
+}
 
 [[noreturn]] void kernelEntry() {
+    w = mainWindow();
+    clearWindow(w);
+    initScreen();
     setupInterrupts();
-
-    // divisionByZeroExperiment
-    // syscallExperiment
-    // ioExperiment
-
-    infiniteLoop();
+    experiment();
 }

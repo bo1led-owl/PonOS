@@ -26,6 +26,9 @@ typedef enum : u8 {
 struct Window;
 typedef struct Window* WindowHandle;
 
+constexpr usize VGA_COLUMNS = 80;
+constexpr usize VGA_ROWS = 25;
+
 /// Add a new window to pool. This must be called before `initScreen`.
 /// Returns a handle to the new window.
 WindowHandle addWindow(usize start_x, usize start_y, usize rows, usize columns);
