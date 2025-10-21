@@ -9,10 +9,10 @@ static int globalCounter = 0;
 constexpr int LIMIT = 42;
 
 static void delay() {
-    for (int i = 0; i < 2'500; ++i) {
+    for (int i = 0; i < 2500; ++i) {
         printf(w, "%d\n", i);
         writeToPort(0x80, 0);
-}
+    }
 }
 
 static void timerHandler([[maybe_unused]] const InterruptCtx* ctx) {
