@@ -15,7 +15,6 @@ data Image = Image
 
 instance Target Image where
   build i = do
-    lift $ putStrLn "Building image..."
     imgFile <- artifact i
     kernelFile <- artifact Kernel
     ifM
@@ -24,6 +23,7 @@ instance Target Image where
       (throwError "Kernel is too big, aborting compilation")
   deps _ = pure $ Kernel :> NilDeps
   artifact _ = getFromConfig imgFileByConfig
+  name _ = Just "image"
 
 dd :: FilePath -> FilePath -> Build ()
 dd kernelFile imgFile = do

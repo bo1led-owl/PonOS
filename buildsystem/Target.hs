@@ -46,6 +46,9 @@ class Target (t :: Type) where
   deps :: () => t -> Build Deps
   artifact :: () => t -> Build FilePath
 
+  name :: t -> Maybe String
+  name _ = Nothing
+
   buildIfNeeded :: () => t -> Build ()
   buildIfNeeded t = do
     whenM
@@ -53,6 +56,9 @@ class Target (t :: Type) where
       ( do
           prepare t
           deps t >>= buildAllDeps
+          lift $ case name t of
+            Just name -> putStrLn ("Building " <> name)
+            Nothing -> pure ()
           build t
       )
 
@@ -64,19 +70,17 @@ class Target (t :: Type) where
   needsRebuilding :: t -> Build Bool
   needsRebuilding t = do
     artifactModTime <- artifact t >>= lift . getModTime
-    maybe
-      (pure True)
-      ( \artifactModTime -> do
-          deps <- deps t
-          depArtifacts <- traverseDeps artifact deps
-          someArtifactIsOld <-
-            anyM
-              (fromMaybeM (pure True) . (lift . (`modifiedLaterThan` artifactModTime)))
-              depArtifacts
-          someDepIsOld <- fmap or (traverseDeps needsRebuilding deps)
-          pure $ someArtifactIsOld || someDepIsOld
-      )
-      artifactModTime
+    case artifactModTime of
+      Just artifactModTime -> do
+        deps <- deps t
+        depArtifacts <- traverseDeps artifact deps
+        someArtifactIsOld <-
+          anyM
+            (fromMaybeM (pure True) . (lift . (`modifiedLaterThan` artifactModTime)))
+            depArtifacts
+        someDepIsOld <- fmap or (traverseDeps needsRebuilding deps)
+        pure $ someArtifactIsOld || someDepIsOld
+      Nothing -> pure True
 
 buildAllDeps :: Deps -> Build ()
 buildAllDeps d = traverseDeps buildIfNeeded d $> ()

@@ -4,7 +4,7 @@
 #include "assert.h"
 #include "mem.h"
 #include "panic.h"
-#include "portIo.h"
+#include "hardwareIo.h"
 
 void collectCtx();
 
@@ -45,6 +45,8 @@ static bool hasErrorCode(u8 vector) {
         case 0xE:
         case 0x11:
         case 0x15:
+        case 0x1D:
+        case 0x1E:
             return true;
         default:
             return false;

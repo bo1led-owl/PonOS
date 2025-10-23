@@ -1,5 +1,5 @@
+#include "hardwareIo.h"
 #include "interrupts.h"
-#include "portIo.h"
 #include "utils.h"
 #include "vga.h"
 
@@ -41,10 +41,14 @@ static void keyboardHandler([[maybe_unused]] const InterruptCtx* ctx) {
     infiniteLoop();
 }
 
-[[noreturn]] void kernelEntry() {
+static void kernelInit() {
     w = mainWindow();
     clearWindow(w);
     initScreen();
     setupInterrupts();
+}
+
+[[noreturn]] void kernelEntry() {
+    kernelInit();
     experiment();
 }
