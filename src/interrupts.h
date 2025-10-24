@@ -8,7 +8,6 @@ typedef void (*InterruptHandler)(const InterruptCtx*);
 
 typedef enum {
     Gate_Interrupt = 0b110,
-    Gate_Trap = 0b111,
 } GateDescriptorType;
 
 constexpr u8 DISABLE_ALL = 0;
@@ -23,15 +22,13 @@ constexpr u8 TIMER_INTERRUPT_VECTOR = MASTER_IRQ_START;
 constexpr u8 KEYBOARD_INTERRUPT_VECTOR = MASTER_IRQ_START + 1;
 
 void setupInterrupts();
-void setup8259(bool automaticEoi);
+void setup8259();
 
 u8 getMasterDeviceMask();
 u8 getSlaveDeviceMask();
 void setMasterDeviceMask(u8 mask);
 void setSlaveDeviceMask(u8 mask);
 
-void eoi();
-
 void universalHandler(const InterruptCtx* ctx);
 
-void overrideIterruptHandler(u8 vector, GateDescriptorType gate, InterruptHandler handler);
+void overrideIterruptHandler(u8 vector, InterruptHandler handler);

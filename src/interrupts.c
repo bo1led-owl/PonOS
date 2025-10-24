@@ -126,7 +126,7 @@ void setSlaveDeviceMask(u8 mask) {
     writeToPort(SLAVE_DATA_PORT, ~mask);
 }
 
-void setup8259(bool automaticEoi) {
+void setup8259() {
     setMasterDeviceMask(DISABLE_ALL);
     setSlaveDeviceMask(DISABLE_ALL);
 
@@ -142,7 +142,7 @@ void setup8259(bool automaticEoi) {
     writeToPort(MASTER_DATA_PORT, 0b100);  // mask for slave 8259s
     writeToPort(SLAVE_DATA_PORT, 2);       // pin that slave is connected to
 
-    u8 icw4 = (u8)automaticEoi << 1;
+    u8 icw4 = (u8)1 << 1; // enable automatic EOI
     writeToPort(MASTER_DATA_PORT, icw4);
     writeToPort(SLAVE_DATA_PORT, icw4);
 }
@@ -164,8 +164,8 @@ void setupInterrupts() {
     __asm__ volatile("lidt [%0]" ::"r"(&idtDesc));
 }
 
-void overrideIterruptHandler(u8 vector, GateDescriptorType gate, InterruptHandler handler) {
-    idt[vector].type = gate;
+void overrideIterruptHandler(u8 vector, InterruptHandler handler) {
+    idt[vector].type = Gate_Interrupt;
     handlerTable[vector] = handler;
 }
 
