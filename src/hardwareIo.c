@@ -10,7 +10,7 @@ static void writeToPortRaw(u16 port, u8 payload) {
         : "al", "dx");
 }
 
-[[gnu::noinline]] [[clang::noinline]] static void readWriteDelay() {
+static void delay() {
     for (int i = 0; i < 100; ++i) {
         writeToPortRaw(0x80, 0);
     }
@@ -25,11 +25,10 @@ u8 readFromPort(u16 port) {
         : "=r"(res)
         : "r"(port)
         : "al", "dx");
-    readWriteDelay();
     return res;
 }
 
 void writeToPort(u16 port, u8 payload) {
     writeToPortRaw(port, payload);
-    readWriteDelay();
+    delay();
 }
