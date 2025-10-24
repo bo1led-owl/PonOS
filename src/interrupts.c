@@ -2,14 +2,11 @@
 
 #include "alloc.h"
 #include "assert.h"
+#include "mem.h"
 #include "panic.h"
+#include "hardwareIo.h"
 
 void collectCtx();
-
-typedef enum {
-    Gate_Interrupt = 0b110,
-    Gate_Trap = 0b111,
-} GateDescriptorType;
 
 typedef struct {
     u16 offsetLow;
@@ -39,13 +36,38 @@ constexpr usize TRAMPOLINE_SIZE = 8;
 constexpr usize N_VECTORS = 256;
 
 static bool hasErrorCode(u8 vector) {
-    static constexpr u8 INTERRUPTS_WITH_ERROR_CODE[8] = {0x8, 0xA, 0xB, 0xC, 0xD, 0xE, 0x11, 0x15};
-    for (usize i = 0; i < 8; ++i) {
-        if (INTERRUPTS_WITH_ERROR_CODE[i] == vector) {
+    switch (vector) {
+        case 0x8:
+        case 0xA:
+        case 0xB:
+        case 0xC:
+        case 0xD:
+        case 0xE:
+        case 0x11:
+        case 0x15:
+        case 0x1D:
+        case 0x1E:
             return true;
-        }
+        default:
+            return false;
     }
-    return false;
+}
+
+static void writeTrampoline(u8 vector, u8* buffer) {
+    usize offset = 0;
+    if (!hasErrorCode(vector)) {
+        buffer[offset++] = 0x50;  // push eax
+    }
+    // push $vector
+    buffer[offset++] = 0x6A;
+    buffer[offset++] = vector;
+    // jmp collectCtx
+    // +5 to account for the `jmp` size
+    u32 offsetToCollectCtx = (u32)collectCtx - (u32)(buffer + offset + 5);
+    buffer[offset++] = 0xE9;
+    *(u32*)(buffer + offset) = offsetToCollectCtx;
+    offset += 4;
+    assert(offset <= TRAMPOLINE_SIZE);
 }
 
 static void* genTrampolines() {
@@ -53,26 +75,13 @@ static void* genTrampolines() {
 
     for (u16 vector = 0; vector < N_VECTORS; ++vector) {
         u8* trampoline = trampolines + vector * TRAMPOLINE_SIZE;
-        usize offset = 0;
-        if (!hasErrorCode(vector)) {
-            trampoline[offset++] = 0x50;  // push eax
-        }
-        // push $vector
-        trampoline[offset++] = 0x6A;
-        trampoline[offset++] = vector;
-        // jmp collectCtx
-        // +5 to account for the `jmp` size
-        u32 offsetToCollectCtx = (u32)collectCtx - (u32)(trampoline + offset + 5);
-        trampoline[offset++] = 0xE9;
-        *(u32*)(trampoline + offset) = offsetToCollectCtx;
-        offset += 4;
-        assert(offset <= TRAMPOLINE_SIZE);
+        writeTrampoline(vector, trampoline);
     }
 
     return trampolines;
 }
 
-static void* genIdtEntry(IdtEntry* entry, const void* trampoline) {
+static void* genIdtEntry(IdtEntry* entry, const InterruptHandler* trampoline) {
     entry->fixed1 = 0;
     entry->fixed2 = 0b01;
     entry->offsetLow = ((usize)trampoline) & 0xFFFF;
@@ -95,32 +104,102 @@ static void* genIdt(const u8* trampolines) {
     return idtBase;
 }
 
+constexpr u16 MASTER_COMMAND_PORT = 0x20;
+constexpr u16 MASTER_DATA_PORT = 0x21;
+
+constexpr u16 SLAVE_COMMAND_PORT = 0xA0;
+constexpr u16 SLAVE_DATA_PORT = 0xA1;
+
+u8 getMasterDeviceMask() {
+    return ~readFromPort(MASTER_DATA_PORT);
+}
+
+u8 getSlaveDeviceMask() {
+    return ~readFromPort(SLAVE_DATA_PORT);
+}
+
+void setMasterDeviceMask(u8 mask) {
+    writeToPort(MASTER_DATA_PORT, ~mask);
+}
+
+void setSlaveDeviceMask(u8 mask) {
+    writeToPort(SLAVE_DATA_PORT, ~mask);
+}
+
+void setup8259(bool automaticEoi) {
+    setMasterDeviceMask(DISABLE_ALL);
+    setSlaveDeviceMask(DISABLE_ALL);
+
+    constexpr u8 icw1 = 0b10001;
+    writeToPort(MASTER_COMMAND_PORT, icw1);
+    writeToPort(SLAVE_COMMAND_PORT, icw1);
+
+    // icw2: starting vector for IRQ mapping
+    writeToPort(MASTER_DATA_PORT, MASTER_IRQ_START);
+    writeToPort(SLAVE_DATA_PORT, SLAVE_IRQ_START);
+
+    // icw3: cascade configuration
+    writeToPort(MASTER_DATA_PORT, 0b100);  // mask for slave 8259s
+    writeToPort(SLAVE_DATA_PORT, 2);       // pin that slave is connected to
+
+    u8 icw4 = (u8)automaticEoi << 1;
+    writeToPort(MASTER_DATA_PORT, icw4);
+    writeToPort(SLAVE_DATA_PORT, icw4);
+}
+
+void eoi() {
+    writeToPort(MASTER_COMMAND_PORT, 0x20);
+}
+
+static InterruptHandler handlerTable[N_VECTORS];
+static IdtEntry* idt;
+
 void setupInterrupts() {
+    memzero(handlerTable, sizeof(handlerTable));
+
     void* trampolines = genTrampolines();
-    void* idt = genIdt(trampolines);
+    idt = genIdt(trampolines);
     constexpr u16 idtLimit = N_VECTORS * sizeof(IdtEntry) - 1;
     u64 idtDesc = ((u64)idt << 16) | idtLimit;
     __asm__ volatile("lidt [%0]" ::"r"(&idtDesc));
 }
 
+void overrideIterruptHandler(u8 vector, GateDescriptorType gate, InterruptHandler handler) {
+    idt[vector].type = gate;
+    handlerTable[vector] = handler;
+}
+
 void universalHandler(const InterruptCtx* ctx) {
-    panic(
-        "unhandled interrupt 0x%x at 0x%x:0x%x\n\n"
-        "registers:\n"
-        "  eax: 0x%x\n"
-        "  ecx: 0x%x\n"
-        "  edx: 0x%x\n"
-        "  ebx: 0x%x\n"
-        "  esp: 0x%x\n"
-        "  ebp: 0x%x\n"
-        "  esi: 0x%x\n"
-        "  edi: 0x%x\n"
-        "  ds: 0x%x\n"
-        "  es: 0x%x\n"
-        "  fs: 0x%x\n"
-        "  gs: 0x%x\n"
-        "error code: 0x%x\n\n"
-        "eflags: 0x%x",
-        ctx->vector, ctx->cs, ctx->eip, ctx->eax, ctx->ecx, ctx->edx, ctx->ebx, ctx->esp, ctx->ebp,
-        ctx->esi, ctx->edi, ctx->ds, ctx->es, ctx->fs, ctx->gs, ctx->errorCode, ctx->eflags);
+    InterruptHandler handler = handlerTable[ctx->vector];
+    if (handler) {
+        handler(ctx);
+        return;
+    }
+
+#define MSG_WITHOUT_ERROR_CODE                  \
+    "unhandled interrupt 0x%x at 0x%x:0x%x\n\n" \
+    "registers:\n"                              \
+    "  eax: 0x%x\n"                             \
+    "  ecx: 0x%x\n"                             \
+    "  edx: 0x%x\n"                             \
+    "  ebx: 0x%x\n"                             \
+    "  esp: 0x%x\n"                             \
+    "  ebp: 0x%x\n"                             \
+    "  esi: 0x%x\n"                             \
+    "  edi: 0x%x\n"                             \
+    "  ds: 0x%x\n"                              \
+    "  es: 0x%x\n"                              \
+    "  fs: 0x%x\n"                              \
+    "  gs: 0x%x\n"                              \
+    "  eflags: 0x%x\n\n"
+
+#define CTX                                                                                     \
+    ctx->vector, ctx->cs, ctx->eip, ctx->eax, ctx->ecx, ctx->edx, ctx->ebx, ctx->esp, ctx->ebp, \
+        ctx->esi, ctx->edi, ctx->ds, ctx->es, ctx->fs, ctx->gs, ctx->eflags
+
+    if (hasErrorCode(ctx->vector)) {
+        panic(MSG_WITHOUT_ERROR_CODE "error code: 0x%x", CTX, ctx->errorCode);
+    } else {
+        panic(MSG_WITHOUT_ERROR_CODE, CTX);
+    }
 }

@@ -16,7 +16,6 @@ data Kernel = Kernel
 
 instance Target Kernel where
   build Kernel = do
-    lift $ putStrLn "Building kernel..."
     config <- getConfig
     lift $ createDirectoryIfMissing True (outdirByConfig config)
     loaderO <- artifact Loader
@@ -27,6 +26,7 @@ instance Target Kernel where
     c <- depsFromList id <$> lift cFiles
     pure $ Loader :> c
   artifact Kernel = getFromConfig kernelBin
+  name Kernel = Just "kernel"
 
 cFiles :: IO [Clang]
 cFiles = map Clang <$> getFilesWithExtensions srcdir [".c"]
