@@ -76,12 +76,6 @@ call kernelEntry
 end:
     hlt
 
-; utils
-
-global infiniteLoop
-infiniteLoop:
-    jmp infiniteLoop
-
 extern universalHandler
 global collectCtx
 collectCtx:
