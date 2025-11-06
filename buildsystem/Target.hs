@@ -50,17 +50,16 @@ class Target (t :: Type) where
   name _ = Nothing
 
   buildIfNeeded :: () => t -> Build ()
-  buildIfNeeded t = do
+  buildIfNeeded t =
     whenM
       (needsRebuilding t)
-      ( do
-          prepare t
-          deps t >>= buildAllDeps
-          lift $ case name t of
-            Just name -> putStrLn ("Building " <> name)
-            Nothing -> pure ()
-          build t
-      )
+      $ do
+        prepare t
+        deps t >>= buildAllDeps
+        lift $ case name t of
+          Just name -> putStrLn ("Building " <> name)
+          Nothing -> pure ()
+        build t
 
   prepare :: t -> Build ()
   prepare t = do

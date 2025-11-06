@@ -95,13 +95,12 @@ collectCtx:
     mov fs, eax
     mov gs, eax
 
-    ; align stack
     mov ebx, esp
-    mov eax, 12
-    mov ecx, esp
+
+    ; align stack
+    lea ecx, [esp + 12]
     and ecx, 0xF
-    sub eax, ecx
-    sub esp, eax
+    sub esp, ecx
 
     push ebx
     call universalHandler
