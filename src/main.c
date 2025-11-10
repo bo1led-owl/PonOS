@@ -2,13 +2,20 @@
 #include "utils.h"
 #include "vga.h"
 
-static void setupWindows() {}
+static WindowHandle w;
+
+static void setupWindows() {
+    w = addWindow(0, 0, VGA_ROWS, VGA_COLUMNS);
+}
 
 static void kernelInit() {
     setup8259();
+    setupInterrupts();
+
     setupWindows();
     initScreen();
-    setupInterrupts();
+
+    enableInterrupts;
 }
 
 [[noreturn]] void kernelEntry() {

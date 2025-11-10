@@ -2,9 +2,9 @@
 
 #include "alloc.h"
 #include "assert.h"
+#include "hardwareIo.h"
 #include "mem.h"
 #include "panic.h"
-#include "hardwareIo.h"
 
 void collectCtx();
 
@@ -142,13 +142,13 @@ void setup8259() {
     writeToPort(MASTER_DATA_PORT, 0b100);  // mask for slave 8259s
     writeToPort(SLAVE_DATA_PORT, 2);       // pin that slave is connected to
 
-    u8 icw4 = (u8)1 << 1; // enable automatic EOI
+    constexpr u8 icw4 = 0b11;  // enable automatic EOI and 8259 mode
     writeToPort(MASTER_DATA_PORT, icw4);
     writeToPort(SLAVE_DATA_PORT, icw4);
-}
 
-void eoi() {
-    writeToPort(MASTER_COMMAND_PORT, 0x20);
+    // because these get overwritten during configuration somehow
+    setMasterDeviceMask(DISABLE_ALL);
+    setSlaveDeviceMask(DISABLE_ALL);
 }
 
 static InterruptHandler handlerTable[N_VECTORS];
@@ -165,7 +165,6 @@ void setupInterrupts() {
 }
 
 void overrideIterruptHandler(u8 vector, InterruptHandler handler) {
-    idt[vector].type = Gate_Interrupt;
     handlerTable[vector] = handler;
 }
 

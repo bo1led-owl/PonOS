@@ -11,7 +11,7 @@ typedef enum {
 } GateDescriptorType;
 
 constexpr u8 DISABLE_ALL = 0;
-constexpr u8 ENABLE_ALL = 0xFF;
+constexpr u8 ENABLE_ALL = (u8)~0;
 constexpr u8 ENABLE_TIMER = 1;
 constexpr u8 ENABLE_KEYBOARD = 2;
 

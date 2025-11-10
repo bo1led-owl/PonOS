@@ -11,7 +11,7 @@ static void writeToPortRaw(u16 port, u8 payload) {
 }
 
 static void delay() {
-    for (int i = 0; i < 100; ++i) {
+    for (int i = 0; i < 1000; ++i) {
         writeToPortRaw(0x80, 0);
     }
 }

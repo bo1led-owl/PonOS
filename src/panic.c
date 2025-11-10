@@ -4,9 +4,9 @@
 #include "vga.h"
 
 [[noreturn]] void vpanic(const char* fmt, va_list args) {
-    cli;
+    disableInterrupts;
+
     WindowHandle w = mainWindow();
-    // идея с синим экраном честно украдена у @EugeneKornev
     setBgColor(w, Color_Blue);
     setFgColor(w, Color_White);
     clearWindow(w);
