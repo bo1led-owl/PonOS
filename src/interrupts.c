@@ -6,7 +6,11 @@
 #include "mem.h"
 #include "panic.h"
 
-void collectCtx();
+extern void collectCtx();
+
+typedef enum {
+    Gate_Interrupt = 0b110,
+} GateDescriptorType;
 
 typedef struct {
     u16 offsetLow;
@@ -19,18 +23,7 @@ typedef struct {
     u16 offsetHi;
 } IdtEntry;
 
-typedef struct InterruptCtx {
-    u32 edi, esi, ebp, esp, ebx, edx, ecx, eax;
-    alignas(4) u16 gs, fs, es, ds;
-    alignas(4) u8 vector;
-    u32 errorCode;
-    u32 eip;
-    alignas(4) u16 cs;
-    u32 eflags;
-} InterruptCtx;
-
 static_assert(sizeof(IdtEntry) == 8);
-static_assert(sizeof(InterruptCtx) == 17 * sizeof(u32));
 
 constexpr usize TRAMPOLINE_SIZE = 8;
 constexpr usize N_VECTORS = 256;
@@ -88,7 +81,7 @@ static void* genIdtEntry(IdtEntry* entry, const InterruptHandler* trampoline) {
     entry->offsetHi = (((usize)trampoline) >> 16) & 0xFFFF;
     entry->dpl = 0;
     entry->present = 1;
-    entry->segmentSelector = 8;  // CODE_SEGMENT
+    entry->segmentSelector = KERNEL_CODE_SEGMENT;
     entry->type = Gate_Interrupt;
     return entry;
 }
@@ -154,11 +147,18 @@ void setup8259() {
 static InterruptHandler handlerTable[N_VECTORS];
 static IdtEntry* idt;
 
-void setupInterrupts() {
+void setupInterrupts(SyscallDescriptor* syscalls, usize nSyscalls) {
     memzero(handlerTable, sizeof(handlerTable));
 
     void* trampolines = genTrampolines();
     idt = genIdt(trampolines);
+
+    for (usize i = 0; i < nSyscalls; ++i) {
+        SyscallDescriptor desc = syscalls[i];
+        overrideIterruptHandler(desc.vector, desc.impl);
+        idt[desc.vector].dpl = 3;
+    }
+
     constexpr u16 idtLimit = N_VECTORS * sizeof(IdtEntry) - 1;
     u64 idtDesc = ((u64)idt << 16) | idtLimit;
     __asm__ volatile("lidt [%0]" ::"r"(&idtDesc));
@@ -168,6 +168,53 @@ void overrideIterruptHandler(u8 vector, InterruptHandler handler) {
     handlerTable[vector] = handler;
 }
 
+static const char* interruptName(u8 vector) {
+    switch (vector) {
+        case 0x0:
+            return "#DE";
+        case 0x1:
+            return "#DB";
+        case 0x2:
+            return "NMI";
+        case 0x3:
+            return "#BP";
+        case 0x4:
+            return "#OF";
+        case 0x5:
+            return "#BR";
+        case 0x6:
+            return "#UD";
+        case 0x7:
+            return "#NM";
+        case 0x8:
+            return "#DF";
+        case 0xA:
+            return "#TS";
+        case 0xB:
+            return "#NP";
+        case 0xC:
+            return "#SS";
+        case 0xD:
+            return "#GP";
+        case 0xE:
+            return "#PF";
+        case 0x10:
+            return "#MF";
+        case 0x11:
+            return "#AC";
+        case 0x12:
+            return "#MC";
+        case 0x13:
+            return "#XM";
+        case 0x14:
+            return "#VE";
+        case 0x15:
+            return "#CP";
+        default:
+            return "N/A";
+    }
+}
+
 void universalHandler(const InterruptCtx* ctx) {
     InterruptHandler handler = handlerTable[ctx->vector];
     if (handler) {
@@ -175,26 +222,47 @@ void universalHandler(const InterruptCtx* ctx) {
         return;
     }
 
-#define MSG_WITHOUT_ERROR_CODE                  \
-    "unhandled interrupt 0x%x at 0x%x:0x%x\n\n" \
-    "registers:\n"                              \
-    "  eax: 0x%x\n"                             \
-    "  ecx: 0x%x\n"                             \
-    "  edx: 0x%x\n"                             \
-    "  ebx: 0x%x\n"                             \
-    "  esp: 0x%x\n"                             \
-    "  ebp: 0x%x\n"                             \
-    "  esi: 0x%x\n"                             \
-    "  edi: 0x%x\n"                             \
-    "  ds: 0x%x\n"                              \
-    "  es: 0x%x\n"                              \
-    "  fs: 0x%x\n"                              \
-    "  gs: 0x%x\n"                              \
-    "  eflags: 0x%x\n\n"
+#define MSG_WITHOUT_ERROR_CODE                                                      \
+    "unhandled interrupt 0x%x (%s) at 0x%x:0x%x\n\n"                                \
+    "registers:\n"                                                                  \
+    "  eax: 0x%x\n"                                                                 \
+    "  ecx: 0x%x\n"                                                                 \
+    "  edx: 0x%x\n"                                                                 \
+    "  ebx: 0x%x\n"                                                                 \
+    "  esp: 0x%x\n"                                                                 \
+    "  ebp: 0x%x\n"                                                                 \
+    "  esi: 0x%x\n"                                                                 \
+    "  edi: 0x%x\n"                                                                 \
+    "  ds:  0x%x\n"                                                                 \
+    "  es:  0x%x\n"                                                                 \
+    "  fs:  0x%x\n"                                                                 \
+    "  gs:  0x%x\n"                                                                 \
+    "  eflags: 0b%b (PF=%u,   AF=%u, ZF=%u, SF=%u, TF=%u, IF=%u,  DF=%u,  OF=%u,\n" \
+    "               IOPL=%u, NT=%u, RF=%u, VM=%u, AC=%u, VIF=%u, VIP=%u, ID=%u)\n\n"
 
-#define CTX                                                                                     \
-    ctx->vector, ctx->cs, ctx->eip, ctx->eax, ctx->ecx, ctx->edx, ctx->ebx, ctx->esp, ctx->ebp, \
-        ctx->esi, ctx->edi, ctx->ds, ctx->es, ctx->fs, ctx->gs, ctx->eflags
+#define EXTRACT_BIT(n) ((ctx->eflags >> n) & 1)
+#define CF EXTRACT_BIT(0)
+#define PF EXTRACT_BIT(2)
+#define AF EXTRACT_BIT(4)
+#define ZF EXTRACT_BIT(6)
+#define SF EXTRACT_BIT(7)
+#define TF EXTRACT_BIT(8)
+#define IF EXTRACT_BIT(9)
+#define DF EXTRACT_BIT(10)
+#define OF EXTRACT_BIT(11)
+#define IOPL ((ctx->eflags >> 12) & 0b11)
+#define NT EXTRACT_BIT(14)
+#define RF EXTRACT_BIT(16)
+#define VM EXTRACT_BIT(17)
+#define AC EXTRACT_BIT(18)
+#define VIF EXTRACT_BIT(19)
+#define VIP EXTRACT_BIT(20)
+#define ID EXTRACT_BIT(21)
+
+#define CTX                                                                                       \
+    ctx->vector, interruptName(ctx->vector), ctx->cs, ctx->eip, ctx->eax, ctx->ecx, ctx->edx,     \
+        ctx->ebx, ctx->esp, ctx->ebp, ctx->esi, ctx->edi, ctx->ds, ctx->es, ctx->fs, ctx->gs, CF, \
+        PF, AF, ZF, SF, TF, IF, DF, OF, IOPL, NT, RF, VM, AC, VIF, VIP, ID
 
     if (hasErrorCode(ctx->vector)) {
         panic(MSG_WITHOUT_ERROR_CODE "error code: 0x%x", CTX, ctx->errorCode);
