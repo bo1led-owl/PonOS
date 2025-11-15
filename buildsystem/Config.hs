@@ -22,6 +22,22 @@ outdirByConfig (Config mode asserts) = outdir </> show mode </> (if asserts then
 kernelSizeKb :: Integer
 kernelSizeKb = 20
 
+constants :: [String]
+constants =
+  ("-DKERNEL_SIZE_KB=" ++ show kernelSizeKb)
+    : zipWith format names offsets
+  where
+    format name offset = "-D" ++ name ++ "=" ++ show offset
+    names =
+      [ "KERNEL_CODE_SEGMENT",
+        "KERNEL_DATA_SEGMENT",
+        "APP_CODE_SEGMENT",
+        "APP_DATA_SEGMENT",
+        "TSS_SEGMENT"
+      ]
+    offsets :: [Int]
+    offsets = [i * 8 | i <- [1 ..]]
+
 clangFlags :: Config -> [String]
 clangFlags (Config mode asserts) = prependIf "-DNDEBUG" flags (not asserts)
   where
@@ -37,11 +53,11 @@ clangFlags (Config mode asserts) = prependIf "-DNDEBUG" flags (not asserts)
         "-mno-sse",
         "-mno-mmx",
         "-fno-stack-protector",
-        "-DKERNEL_SIZE_KB=" ++ show kernelSizeKb,
         case mode of
           Dev -> "-O0"
           Release -> "-O2"
       ]
+        ++ constants
     prependIf :: a -> [a] -> Bool -> [a]
     prependIf x xs True = x : xs
     prependIf _ xs False = xs

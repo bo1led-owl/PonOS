@@ -13,7 +13,7 @@ instance Target Loader where
     output <- artifact Loader
     runProcess "nasm" (args output)
     where
-      args output = ["-felf32", "-dKERNEL_SIZE_KB=" ++ show kernelSizeKb, loaderSource, "-o", output]
+      args output = constants ++ ["-felf32", loaderSource, "-o", output]
   deps Loader = pure $ File loaderSource :> NilDeps
   artifact Loader = pure (outdir </> "loader.o")
   name Loader = Just "loader"
