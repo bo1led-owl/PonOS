@@ -1,4 +1,5 @@
 #include "alloc.h"
+#include "string.h"
 #include "interrupts.h"
 #include "syscalls.h"
 #include "userspace.h"
@@ -64,8 +65,13 @@ static void timerHandler(const InterruptCtx* ctx) {
 
 static void userspaceProgram() {
     static const char msg[] = "HELLO SYSCALL ";
+    static const char lf = '\n';
     for (;;) {
-        write(w, msg, 14);
+        for (int i = 0; i < 4; ++i) {
+            write(w, msg, strlen(msg));
+        }
+
+        write(w, &lf, 1);
     }
     infiniteLoop();
 }
