@@ -1,27 +1,18 @@
 #include "alloc.h"
-#include "string.h"
 #include "interrupts.h"
+#include "string.h"
 #include "syscalls.h"
 #include "userspace.h"
 #include "utils.h"
 #include "vga.h"
 
-static WindowHandle w;
-
-static void setupWindows() {
-    w = addWindow(0, 0, VGA_ROWS, VGA_COLUMNS);
-}
-
 static void writeImpl(const InterruptCtx* ctx) {
-    // currently this window handle is a massive security hole,
-    // but it will be patched when I get an idea on how to identify
-    // programs so that I can map them to their windows
-    const WindowHandle wh = (WindowHandle)ctx->edi;
+    const WindowHandle w = curWindowHandle();
+    const char* buf = (const char*)ctx->edi;
+    const usize n = ctx->esi;
 
-    const char* buf = (const char*)ctx->esi;
-    const usize n = ctx->edx;
     for (usize i = 0; i < n; ++i) {
-        putchar(wh, buf[i]);
+        putchar(w, buf[i]);
     }
 }
 
@@ -31,19 +22,14 @@ static void kernelInit() {
     SyscallDescriptor syscalls[] = {(SyscallDescriptor){.vector = 0x30, .impl = writeImpl}};
     setupInterrupts(syscalls, sizeof(syscalls) / sizeof(SyscallDescriptor));
 
-    setupWindows();
-    initScreen();
-
     enableInterrupts;
 }
 
 static void printEsp() {
     u32 esp;
     __asm__ volatile("mov %0, esp" : "=r"(esp));
-    printf(w, "0x%x\n", esp);
+    printf(mainWindow(), "0x%x\n", esp);
 }
-
-static unsigned i = 1;
 
 static void disableKernelCodeSegment() {
     extern u64 kernelCsd;
@@ -52,10 +38,10 @@ static void disableKernelCodeSegment() {
 
 static void printTrap(unsigned x) {
     if (x == 0) {
-        printf(w, "EXPLODE\n");
+        printf(mainWindow(), "EXPLODE\n");
         infiniteLoop();
     } else {
-        printf(w, "%u ", x);
+        printf(mainWindow(), "%u ", x);
     }
 }
 
@@ -63,28 +49,50 @@ static void timerHandler(const InterruptCtx* ctx) {
     // clearWindow(w);
 }
 
-static void userspaceProgram() {
-    static const char msg[] = "HELLO SYSCALL ";
-    static const char lf = '\n';
-    for (;;) {
-        for (int i = 0; i < 4; ++i) {
-            write(w, msg, strlen(msg));
-        }
-
-        write(w, &lf, 1);
+static void fmtInt(char* buf, unsigned x) {
+    if (x == 0) {
+        buf[0] = '0';
+        buf[1] = 0;
+        return;
     }
+
+    usize i = 0;
+    while (x > 0) {
+        buf[i++] = x % 10 + '0';
+        x /= 10;
+    }
+    buf[i] = 0;
+
+    for (usize j = 0; j < i / 2; ++j) {
+        char tmp = buf[j];
+        buf[j] = buf[i - j - 1];
+        buf[i - j - 1] = tmp;
+    }
+}
+
+static void userspaceProgram() {
+    char buf[16];
+    for (unsigned i = 0;; ++i) {
+        fmtInt(buf, i);
+        usize len = strlen(buf);
+        buf[len] = '\n';
+        write(buf, len + 1);
+    }
+
     infiniteLoop();
 }
 
 [[noreturn]] void kernelEntry() {
     kernelInit();
 
-    setMasterDeviceMask(DISABLE_ALL | ENABLE_TIMER);
+    setMasterDeviceMask(DISABLE_ALL);
     overrideIterruptHandler(TIMER_INTERRUPT_VECTOR, timerHandler);
 
     u8* stack = (u8*)mallocImmortal(4096, 16) + 4096;
     // printf(w, "%p\n", stack);
-    startProcess(&userspaceProgram, stack);
 
-    infiniteLoop();
+    WindowHandle w = addWindow(0, 0, VGA_ROWS, VGA_COLUMNS);
+    initScreen();
+
+    startProcess(userspaceProgram, stack, w);
 }

@@ -17,7 +17,10 @@ constexpr u32 ENABLE_IF = 1 << 9;
 constexpr u32 CPL3 = 0b11;
 constexpr u32 RPL3 = 0b11;
 
-[[noreturn]] void startProcess(void (*entry)(), void* stack) {
+static WindowHandle windowHandle;
+
+[[noreturn]] void startProcess(void (*entry)(), void* stack, WindowHandle w) {
+    windowHandle = w;
     FakeCtx ctx = (FakeCtx){
         .ctx =
             (InterruptCtx){
@@ -33,5 +36,8 @@ constexpr u32 RPL3 = 0b11;
         .esp = (usize)stack,
     };
     restoreCtx(&ctx);
-    UNREACHABLE;
+}
+
+WindowHandle curWindowHandle() {
+    return windowHandle;
 }

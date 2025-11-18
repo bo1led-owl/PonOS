@@ -1,11 +1,10 @@
 #include "string.h"
 
 usize strlen(const char* s) {
-    usize len = 0;
-    while (s[len]) {
-        len++;
+    if (*s == 0) {
+        return 0;
     }
-    return len;
+    return 1 + strlen(s + 1);
 }
 
 int strcmp(const char* a, const char* b) {
