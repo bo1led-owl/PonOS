@@ -6,20 +6,17 @@
 #include "utils.h"
 #include "vga.h"
 
-static void writeImpl(const InterruptCtx* ctx) {
+static void printImpl(const InterruptCtx* ctx) {
     const WindowHandle w = curWindowHandle();
-    const char* buf = (const char*)ctx->edi;
-    const usize n = ctx->esi;
+    const usize n = ctx->edi;
 
-    for (usize i = 0; i < n; ++i) {
-        putchar(w, buf[i]);
-    }
+    printf(w, "%d\n", n);
 }
 
 static void kernelInit() {
     setup8259();
 
-    SyscallDescriptor syscalls[] = {(SyscallDescriptor){.vector = 0x30, .impl = writeImpl}};
+    SyscallDescriptor syscalls[] = {(SyscallDescriptor){.vector = 0x30, .impl = printImpl}};
     setupInterrupts(syscalls, sizeof(syscalls) / sizeof(SyscallDescriptor));
 
     enableInterrupts;
@@ -71,12 +68,8 @@ static void fmtInt(char* buf, unsigned x) {
 }
 
 static void userspaceProgram() {
-    char buf[16];
     for (unsigned i = 0;; ++i) {
-        fmtInt(buf, i);
-        usize len = strlen(buf);
-        buf[len] = '\n';
-        write(buf, len + 1);
+        printInt(i);
     }
 
     infiniteLoop();

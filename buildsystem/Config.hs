@@ -19,6 +19,9 @@ outdir = "build"
 outdirByConfig :: Config -> FilePath
 outdirByConfig (Config mode asserts) = outdir </> show mode </> (if asserts then "assert" else "noassert")
 
+imgFileByConfig :: Config -> FilePath
+imgFileByConfig config = outdirByConfig config </> "boot.img"
+
 kernelSizeKb :: Integer
 kernelSizeKb = 20
 
@@ -75,6 +78,3 @@ qemuFlags img =
     "-drive",
     "file=" ++ img ++ ",format=raw,if=floppy"
   ]
-
-imgFileByConfig :: Config -> FilePath
-imgFileByConfig config = outdirByConfig config </> "boot.img"
