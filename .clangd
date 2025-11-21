@@ -1,5 +1,18 @@
 CompileFlags:
-  Add: [-Wall, -Wextra, -Wpedantic, -Wcovered-switch-default, -ffreestanding, -m32, -DKERNEL_SIZE_KB]
+  Add: [
+    -Wall,
+    -Wextra,
+    -Wpedantic,
+    -Wcovered-switch-default,
+    -ffreestanding,
+    -m32,
+    -DKERNEL_SIZE_KB,
+    -DKERNEL_CODE_SEGMENT,
+    -DKERNEL_DATA_SEGMENT,
+    -DAPP_CODE_SEGMENT,
+    -DAPP_DATA_SEGMENT,
+    -DTSS_SEGMENT,
+  ]
 
 ---
 

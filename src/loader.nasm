@@ -59,16 +59,26 @@ mov eax, cr0
 or  eax, 1
 mov cr0, eax
 
-jmp CODE_SEGMENT:trampoline
+jmp KERNEL_CODE_SEGMENT:trampoline
 
 bits 32
 trampoline:
-mov eax, DATA_SEGMENT
+mov eax, KERNEL_DATA_SEGMENT
 mov ds, eax
 mov ss, eax
 mov es, eax
 mov fs, eax
 mov gs, eax
+
+; setup tss descriptor
+mov eax, tss
+mov word [tssSd + 2], ax
+shr eax, 16
+mov byte [tssSd + 4], al
+mov byte [tssSd + 7], ah
+
+mov ax, TSS_SEGMENT
+ltr ax
 
 extern kernelEntry
 call kernelEntry
@@ -89,7 +99,7 @@ collectCtx:
     cld
 
     ; reset segment registers
-    mov eax, DATA_SEGMENT
+    mov eax, KERNEL_DATA_SEGMENT
     mov ds, eax
     mov es, eax
     mov fs, eax
@@ -105,6 +115,7 @@ collectCtx:
     push ebx
     call universalHandler
     mov esp, ebx
+restoreCtxFromEsp:
     popa
     pop gs
     pop fs
@@ -112,6 +123,17 @@ collectCtx:
     pop ds
     add esp, 8 ; error code and vector
     iret
+
+global restoreCtx
+restoreCtx:
+    mov esp, [esp + 4]
+    jmp restoreCtxFromEsp
+
+global getEflags
+getEflags:
+    pushfd
+    pop eax
+    ret
 
 bits 16
 handleErr:
@@ -128,29 +150,59 @@ handleErr:
 errMsg: db "Error reading from disk", 0
 
 gdtDescriptor:
-  dw 0x17
+  dw 0x2F
   dd gdt
+
+global kernelCsd
 
 align 8
 gdt:
     .null:                  dq 0
-    csd:
+    kernelCsd:
         .limitLo:           dw 0xFF
         .baseLo:            dw 0
         .baseMid:           db 0
         .P_DPL_S_type:      db 0b1001_1010
         .G_B_0_AVL_limitHi: db 0b1100_1111
         .baseHi:            db 0
-    dsd:
+    kernerDsd:
         .limitLo:           dw 0xFF
         .baseLo:            dw 0
         .baseMid:           db 0
         .P_DPL_S_type:      db 0b1001_0010
         .G_B_0_AVL_limitHi: db 0b1100_1111
         .baseHi:            db 0
+    appCsd:
+        .limitLo:           dw 0xFF
+        .baseLo:            dw 0
+        .baseMid:           db 0
+        .P_DPL_S_type:      db 0b1111_1010
+        .G_B_0_AVL_limitHi: db 0b1100_1111
+        .baseHi:            db 0
+    appDsd:
+        .limitLo:           dw 0xFF
+        .baseLo:            dw 0
+        .baseMid:           db 0
+        .P_DPL_S_type:      db 0b1111_0010
+        .G_B_0_AVL_limitHi: db 0b1100_1111
+        .baseHi:            db 0
+    tssSd:
+        .limitLo:           dw 0x6B
+        .baseLo:            dw 0           ; set at runtime
+        .baseMid:           db 0           ; set at runtime
+        .P_DPL_S_type:      db 0b1000_1001
+        .G_0_0_AVL_limitHi: db 0b0000_0000
+        .baseHi:            db 0           ; set at runtime
 
-CODE_SEGMENT equ 8
-DATA_SEGMENT equ 16
+tss:
+    dd 0
+    dd 0x7C00
+    dw KERNEL_DATA_SEGMENT
+    dw 0
+    times 22 dd 0
+    dw 0
+    dw 108
+    dd 0
 
 times 510-($-$$) db 0
 dw 0xAA55
