@@ -58,7 +58,7 @@ clangFlags (Config mode asserts) = prependIf "-DNDEBUG" flags (not asserts)
         "-fno-stack-protector",
         case mode of
           Dev -> "-O0"
-          Release -> "-O2"
+          Release -> "-Oz"
       ]
         ++ constants
     prependIf :: a -> [a] -> Bool -> [a]

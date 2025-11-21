@@ -46,27 +46,6 @@ static void timerHandler(const InterruptCtx* ctx) {
     // clearWindow(w);
 }
 
-static void fmtInt(char* buf, unsigned x) {
-    if (x == 0) {
-        buf[0] = '0';
-        buf[1] = 0;
-        return;
-    }
-
-    usize i = 0;
-    while (x > 0) {
-        buf[i++] = x % 10 + '0';
-        x /= 10;
-    }
-    buf[i] = 0;
-
-    for (usize j = 0; j < i / 2; ++j) {
-        char tmp = buf[j];
-        buf[j] = buf[i - j - 1];
-        buf[i - j - 1] = tmp;
-    }
-}
-
 static void userspaceProgram() {
     for (unsigned i = 0;; ++i) {
         printInt(i);

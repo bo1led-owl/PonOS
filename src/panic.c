@@ -19,4 +19,5 @@
     va_list args;
     va_start(args);
     vpanic(fmt, args);
+    va_end(args);
 }
