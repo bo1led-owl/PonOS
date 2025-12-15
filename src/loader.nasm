@@ -153,8 +153,6 @@ gdtDescriptor:
   dw 0x2F
   dd gdt
 
-global kernelCsd
-
 align 8
 gdt:
     .null:                  dq 0
