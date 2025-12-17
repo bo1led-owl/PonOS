@@ -22,8 +22,7 @@ static __attribute__((naked)) u32 getEflags() {
     __asm__ volatile(
         "pushfd\n"
         "pop eax\n"
-        "ret\n"
-    );
+        "ret\n");
 }
 
 [[noreturn]] void startProcess(void (*entry)(), void* stack, WindowHandle w) {

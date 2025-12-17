@@ -267,7 +267,10 @@ void universalHandler(const InterruptCtx* ctx) {
     if (ctx->vector == 14) {  // page fault
         usize cr2;
         __asm__ volatile("mov %0, cr2" : "=r"(cr2) : : "eax");
-        panic(MSG_WITHOUT_ERROR_CODE "error code: 0x%x\naccessed address: 0x%x", CTX, ctx->errorCode, cr2);
+        panic(MSG_WITHOUT_ERROR_CODE "error code: 0x%x\naccessed address: 0x%x",
+              CTX,
+              ctx->errorCode,
+              cr2);
     } else if (hasErrorCode(ctx->vector)) {
         panic(MSG_WITHOUT_ERROR_CODE "error code: 0x%x", CTX, ctx->errorCode);
     } else {

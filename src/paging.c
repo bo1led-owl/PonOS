@@ -40,8 +40,11 @@ void freePage(void* p) {
     freeList = p;
 }
 
-void assignPageTableEntry(PageTableEntry* pte, void* addr, bool accessibleInUserspace,
-                          bool writeAllowed, bool present) {
+void assignPageTableEntry(PageTableEntry* pte,
+                          void* addr,
+                          bool accessibleInUserspace,
+                          bool writeAllowed,
+                          bool present) {
     assert(((usize)addr & 0x111) == 0);
     *pte = (PageTableEntry){
         .accessibleInUserspace = accessibleInUserspace,
@@ -52,8 +55,12 @@ void assignPageTableEntry(PageTableEntry* pte, void* addr, bool accessibleInUser
     };
 }
 
-void assignPageDirectoryEntry(PageDirectoryEntry* pde, void* addr, bool hugePage,
-                              bool accessibleInUserspace, bool writeAllowed, bool present) {
+void assignPageDirectoryEntry(PageDirectoryEntry* pde,
+                              void* addr,
+                              bool hugePage,
+                              bool accessibleInUserspace,
+                              bool writeAllowed,
+                              bool present) {
     assert(((usize)addr & 0x111) == 0);
     *pde = (PageDirectoryEntry){
         .accessibleInUserspace = accessibleInUserspace,

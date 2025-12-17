@@ -10,3 +10,6 @@ AllowShortLoopsOnASingleLine: false
 DerivePointerAlignment: false
 PointerAlignment: Left
 InsertBraces: true
+BinPackParameters: OnePerLine
+BinPackArguments: false
+AllowAllParametersOfDeclarationOnNextLine: false

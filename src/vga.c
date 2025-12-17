@@ -44,7 +44,8 @@ static void putcharRaw(WindowHandle w, char c, usize x, usize y) {
 
 static void scroll(WindowHandle w) {
     for (usize i = 1; i < w->rows; ++i) {
-        memcpy(w->buffer + VGA_COLUMNS * (i - 1), w->buffer + VGA_COLUMNS * i,
+        memcpy(w->buffer + VGA_COLUMNS * (i - 1),
+               w->buffer + VGA_COLUMNS * i,
                w->columns * sizeof(VgaChar));
     }
 

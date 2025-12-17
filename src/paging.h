@@ -40,11 +40,18 @@ void* allocPage();
 void* allocZeroedPage();
 void freePage(void* p);
 
-void assignPageTableEntry(PageTableEntry* pte, void* addr, bool accessibleInUserspace,
-                          bool writeAllowed, bool present);
+void assignPageTableEntry(PageTableEntry* pte,
+                          void* addr,
+                          bool accessibleInUserspace,
+                          bool writeAllowed,
+                          bool present);
 
-void assignPageDirectoryEntry(PageDirectoryEntry* pde, void* addr, bool hugePage,
-                              bool accessibleInUserspace, bool writeAllowed, bool present);
+void assignPageDirectoryEntry(PageDirectoryEntry* pde,
+                              void* addr,
+                              bool hugePage,
+                              bool accessibleInUserspace,
+                              bool writeAllowed,
+                              bool present);
 
 extern void setupPaging(PageDirectoryEntry* pageDirectory);
 extern void enablePaging();
