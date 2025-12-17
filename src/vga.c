@@ -19,7 +19,7 @@ typedef struct Window {
     usize rows, columns;
 } Window;
 
-constexpr usize MAX_WINDOWS = 32;
+static constexpr usize MAX_WINDOWS = 32;
 static bool initialized = false;
 static Window windows[MAX_WINDOWS] = {};
 static usize nWindows = 0;

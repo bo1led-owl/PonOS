@@ -13,6 +13,7 @@ import File
 import System.Directory
 import System.FilePath
 import System.IO
+import System.Process (proc)
 import Target
 import Text.Megaparsec
 import Text.Megaparsec.Char
@@ -24,7 +25,8 @@ instance Target Clang where
   build c@(Clang file) = do
     config <- getConfig
     output <- artifact c
-    runProcess "clang" (clangFlags config ++ ["-c", file, "-o", output])
+    runProcess $ proc "clang" (clangFlags config ++ ["-c", file, "-o", output])
+
   deps c@(Clang input) = do
     artifactModTime <- artifact c >>= lift . getModTime
     getDeps input artifactModTime
@@ -41,7 +43,7 @@ getDeps input artifactModTime = do
     ( do
         lift $ createDirectoryIfMissing True (takeDirectory depFile)
         flags <- getFromConfig clangFlags
-        runProcess "clang" (flags ++ ["-MM", "-MF", depFile, input])
+        runProcess $ proc "clang" (flags ++ ["-MM", "-MF", depFile, input])
     )
   depFileContents <- lift $ readFile' depFile
   pure (depsFromList File $ parseDepFile depFile depFileContents)

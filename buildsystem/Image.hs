@@ -8,6 +8,7 @@ import Control.Monad.Except
 import Control.Monad.Extra
 import Control.Monad.Reader
 import Kernel
+import System.Process (proc)
 import Target
 import Utils
 
@@ -27,8 +28,8 @@ instance Target Image where
 
 dd :: FilePath -> FilePath -> Build ()
 dd kernelFile imgFile = do
-  runProcessSilent "dd" ["if=/dev/zero", "of=" ++ imgFile, "bs=1024", "count=1440"]
-  runProcessSilent "dd" ["if=" ++ kernelFile, "of=" ++ imgFile, "conv=notrunc"]
+  runProcessSilent (proc "dd" ["if=/dev/zero", "of=" ++ imgFile, "bs=1024", "count=1440"])
+  runProcessSilent (proc "dd" ["if=" ++ kernelFile, "of=" ++ imgFile, "conv=notrunc"])
 
 checkSize :: FilePath -> IO Bool
 checkSize = fmap (< kernelSizeKb) . getFileSizeKb

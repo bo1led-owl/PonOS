@@ -25,8 +25,8 @@ typedef struct {
 
 static_assert(sizeof(IdtEntry) == 8);
 
-constexpr usize TRAMPOLINE_SIZE = 8;
-constexpr usize N_VECTORS = 256;
+static constexpr usize TRAMPOLINE_SIZE = 8;
+static constexpr usize N_VECTORS = 256;
 
 static bool hasErrorCode(u8 vector) {
     switch (vector) {
@@ -97,11 +97,11 @@ static void* genIdt(const u8* trampolines) {
     return idtBase;
 }
 
-constexpr u16 MASTER_COMMAND_PORT = 0x20;
-constexpr u16 MASTER_DATA_PORT = 0x21;
+static constexpr u16 MASTER_COMMAND_PORT = 0x20;
+static constexpr u16 MASTER_DATA_PORT = 0x21;
 
-constexpr u16 SLAVE_COMMAND_PORT = 0xA0;
-constexpr u16 SLAVE_DATA_PORT = 0xA1;
+static constexpr u16 SLAVE_COMMAND_PORT = 0xA0;
+static constexpr u16 SLAVE_DATA_PORT = 0xA1;
 
 u8 getMasterDeviceMask() {
     return ~readFromPort(MASTER_DATA_PORT);
@@ -264,7 +264,11 @@ void universalHandler(const InterruptCtx* ctx) {
         ctx->ebx, ctx->esp, ctx->ebp, ctx->esi, ctx->edi, ctx->ds, ctx->es, ctx->fs, ctx->gs, CF, \
         PF, AF, ZF, SF, TF, IF, DF, OF, IOPL, NT, RF, VM, AC, VIF, VIP, ID
 
-    if (hasErrorCode(ctx->vector)) {
+    if (ctx->vector == 14) {  // page fault
+        usize cr2;
+        __asm__ volatile("mov %0, cr2" : "=r"(cr2) : : "eax");
+        panic(MSG_WITHOUT_ERROR_CODE "error code: 0x%x\naccessed address: 0x%x", CTX, ctx->errorCode, cr2);
+    } else if (hasErrorCode(ctx->vector)) {
         panic(MSG_WITHOUT_ERROR_CODE "error code: 0x%x", CTX, ctx->errorCode);
     } else {
         panic(MSG_WITHOUT_ERROR_CODE, CTX);

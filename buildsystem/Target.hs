@@ -33,6 +33,13 @@ traverseDeps :: (Applicative f) => (forall t. (Target t) => t -> f b) -> Deps ->
 traverseDeps _ NilDeps = pure []
 traverseDeps f (d :> ds) = (:) <$> f d <*> traverseDeps f ds
 
+instance Semigroup Deps where
+  NilDeps <> d = d
+  (d :> d1) <> d2 = d :> (d1 <> d2)
+
+instance Monoid Deps where
+  mempty = NilDeps
+
 runTarget :: (Target t) => t -> Build ()
 runTarget = buildIfNeeded
 

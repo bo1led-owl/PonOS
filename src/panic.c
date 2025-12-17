@@ -1,5 +1,6 @@
 #include "panic.h"
 
+#include "interrupts.h"
 #include "utils.h"
 #include "vga.h"
 

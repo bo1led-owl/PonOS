@@ -43,3 +43,8 @@ void setSlaveDeviceMask(u8 mask);
 void universalHandler(const InterruptCtx* ctx);
 
 void overrideIterruptHandler(u8 vector, InterruptHandler handler);
+
+[[noreturn]] extern void restoreCtx(void* ctx);
+
+#define disableInterrupts __asm__ volatile("cli")
+#define enableInterrupts __asm__ volatile("sti")
