@@ -70,12 +70,12 @@ mov es, eax
 mov fs, eax
 mov gs, eax
 
-; setup tss descriptor
-mov eax, tss
-mov word [tssSd + 2], ax
-shr eax, 16
-mov byte [tssSd + 4], al
-mov byte [tssSd + 7], ah
+; ; setup tss descriptor
+; mov eax, tss
+; mov word [tssSd + 2], ax
+; shr eax, 16
+; mov byte [tssSd + 4], al
+; mov byte [tssSd + 7], ah
 
 mov ax, TSS_SEGMENT
 ltr ax
@@ -140,11 +140,11 @@ gdt:
         .baseHi:            db 0
     tssSd:
         .limitLo:           dw 0x6B
-        .baseLo:            dw 0           ; set at runtime
-        .baseMid:           db 0           ; set at runtime
+        .baseLo:            dw tss
+        .baseMid:           db 0 
         .P_DPL_S_type:      db 0b1000_1001
         .G_0_0_AVL_limitHi: db 0b0000_0000
-        .baseHi:            db 0           ; set at runtime
+        .baseHi:            db 0
 
 tss:
     dd 0
