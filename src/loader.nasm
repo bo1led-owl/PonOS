@@ -70,13 +70,6 @@ mov es, eax
 mov fs, eax
 mov gs, eax
 
-; ; setup tss descriptor
-; mov eax, tss
-; mov word [tssSd + 2], ax
-; shr eax, 16
-; mov byte [tssSd + 4], al
-; mov byte [tssSd + 7], ah
-
 mov ax, TSS_SEGMENT
 ltr ax
 
