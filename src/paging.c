@@ -4,6 +4,7 @@
 #include "mem.h"
 #include "panic.h"
 #include "types.h"
+#include "userspace.h"
 
 static constexpr usize ARENA_START = 0x400000;
 static constexpr usize ARENA_END = ARENA_START + RAM_SIZE;
@@ -87,8 +88,8 @@ void initPaging() {
 
     for (usize i = 0; i < 1024; ++i) {
         usize frame = i * 4 * KiB;
-        bool isVgaMem = frame >= 0x80000 && frame < 0x100000;
-        assignPageTableEntry(pt + i, (void*)frame, !isVgaMem, true, true);
+        bool kernelOnly = frame < 0x7000 || (frame >= 0x80000 && frame < 0x100000);
+        assignPageTableEntry(pt + i, (void*)frame, !kernelOnly, true, true);
     }
 
     setupPagingControlRegisters(pdt);
