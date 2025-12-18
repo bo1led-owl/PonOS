@@ -81,6 +81,7 @@ end:
 
 %include "src/interrupts.nasm"
 %include "src/paging.nasm"
+%include "src/syscalls.nasm"
 
 bits 16
 handleErr:

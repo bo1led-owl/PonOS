@@ -36,6 +36,8 @@ static_assert(sizeof(HugePage) == 4 * MiB);
 static_assert(sizeof(PageTableEntry) == 4);
 static_assert(sizeof(PageDirectoryEntry) == 4);
 
+extern PageDirectoryEntry* pdt;
+
 void* allocPage();
 void* allocZeroedPage();
 void freePage(void* p);
@@ -53,6 +55,6 @@ void assignPageDirectoryEntry(PageDirectoryEntry* pde,
                               bool writeAllowed,
                               bool present);
 
-extern void setupPaging(PageDirectoryEntry* pageDirectory);
+extern void initPaging();
 extern void enablePaging();
 extern void disablePaging();

@@ -3,6 +3,7 @@
 #include <alloca.h>
 
 #include "interrupts.h"
+#include "paging.h"
 #include "types.h"
 
 typedef struct {
@@ -25,7 +26,24 @@ static __attribute__((naked)) u32 getEflags() {
         "ret\n");
 }
 
-[[noreturn]] void startProcess(void (*entry)(), void* stack, WindowHandle w) {
+static void* initVirtualAddrSpace() {
+    disablePaging();
+
+    PageTableEntry* pt = allocPage();
+    assignPageDirectoryEntry(pdt + 1, pt, false, true, true, true);
+
+    for (usize i = 0; i < 1024; ++i) {
+        assignPageTableEntry(pt + i, allocPage(), true, true, true);
+    }
+
+    enablePaging();
+
+    return (void*)(0x800000);
+}
+
+[[noreturn]] void startProcess(void (*entry)(), WindowHandle w) {
+    void* stack = initVirtualAddrSpace();
+
     windowHandle = w;
     FakeCtx ctx = (FakeCtx){
         .ctx =

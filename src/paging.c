@@ -11,6 +11,8 @@ static constexpr usize ARENA_END = ARENA_START + RAM_SIZE;
 static void** freeList = nullptr;
 static Page* cur = (Page*)ARENA_START;
 
+PageDirectoryEntry* pdt = nullptr;
+
 void* allocPage() {
     if (freeList) {
         void* res = freeList;
@@ -61,7 +63,9 @@ void assignPageDirectoryEntry(PageDirectoryEntry* pde,
                               bool accessibleInUserspace,
                               bool writeAllowed,
                               bool present) {
+    assert(pdt);
     assert(((usize)addr & 0x111) == 0);
+
     *pde = (PageDirectoryEntry){
         .accessibleInUserspace = accessibleInUserspace,
         .hugePage = hugePage,
@@ -70,4 +74,22 @@ void assignPageDirectoryEntry(PageDirectoryEntry* pde,
         .writeAllowed = writeAllowed,
         .present = present,
     };
+}
+
+extern void setupPagingControlRegisters(PageDirectoryEntry* pdt);
+
+void initPaging() {
+    pdt = allocZeroedPage();
+
+    PageTableEntry* pt = allocPage();
+
+    assignPageDirectoryEntry(pdt, pt, false, true, true, true);
+
+    for (usize i = 0; i < 1024; ++i) {
+        usize frame = i * 4 * KiB;
+        bool isVgaMem = frame >= 0x80000 && frame < 0x100000;
+        assignPageTableEntry(pt + i, (void*)frame, !isVgaMem, true, true);
+    }
+
+    setupPagingControlRegisters(pdt);
 }

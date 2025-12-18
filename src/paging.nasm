@@ -1,7 +1,7 @@
 bits 32
 
-global setupPaging
-setupPaging:
+global setupPagingControlRegisters
+setupPagingControlRegisters:
     mov eax, cr4
     or eax, (1 << 4)
     mov cr4, eax

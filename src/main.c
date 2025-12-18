@@ -1,9 +1,7 @@
-#include "alloc.h"
 #include "interrupts.h"
 #include "paging.h"
 #include "syscalls.h"
 #include "userspace.h"
-#include "utils.h"
 #include "vga.h"
 
 static void printImpl(const InterruptCtx* ctx) {
@@ -13,44 +11,60 @@ static void printImpl(const InterruptCtx* ctx) {
     printf(w, "%d\n", n);
 }
 
-static void kernelInit() {
+static int param = 0;
+static WindowHandle w;
+
+static void userspaceProgram() {
+    // for (unsigned i = 0;; ++i) {
+    //     printInt(i);
+    // }
+
+    // infiniteLoop();
+    exit(param);
+}
+
+static void exitImpl(const InterruptCtx* ctx) {
+    const WindowHandle curW = curWindowHandle();
+    const usize status = ctx->edi;
+
+    printf(curW, "%d\n", status);
+
+    disablePaging();
+
+    PageTableEntry* pt = (PageTableEntry*)(pdt[1].addr << 12);
+    for (usize i = 0; i < 1024; ++i) {
+        freePage((void*)(pt[i].addr << (usize)12));
+    }
+    freePage(pt);
+
+    pdt[1].present = false;
+
+    enablePaging();
+
+    param += 1;
+    startProcess(userspaceProgram, w);
+}
+
+static void initInterrupts() {
     setup8259();
 
-    SyscallDescriptor syscalls[] = {(SyscallDescriptor){.vector = 0x30, .impl = printImpl}};
+    SyscallDescriptor syscalls[] = {
+        (SyscallDescriptor){.vector = 0x30, .impl = printImpl},
+        (SyscallDescriptor){.vector = 0x31, .impl = exitImpl},
+    };
     setupInterrupts(syscalls, sizeof(syscalls) / sizeof(SyscallDescriptor));
 
     enableInterrupts;
-
-    PageDirectoryEntry* pdt = allocZeroedPage();
-    PageTableEntry* pt = allocPage();
-
-    assignPageDirectoryEntry(pdt, pt, false, true, true, true);
-
-    for (usize i = 0; i < 1024; ++i) {
-        usize frame = i * 4 * KiB;
-        bool isVgaMem = frame >= 0x80000 && frame < 0x100000;
-        assignPageTableEntry(pt + i, (void*)frame, !isVgaMem, true, true);
-    }
-
-    setupPaging(pdt);
-    enablePaging();
-}
-
-static void userspaceProgram() {
-    for (unsigned i = 0;; ++i) {
-        printInt(i);
-    }
-
-    infiniteLoop();
 }
 
 [[noreturn]] void kernelEntry() {
-    kernelInit();
+    initPaging();
+    enablePaging();
 
-    u8* stack = (u8*)mallocImmortal(4096, 16) + 4096;
+    initInterrupts();
 
-    WindowHandle w = addWindow(0, 0, VGA_ROWS, VGA_COLUMNS);
+    w = addWindow(0, 0, VGA_ROWS, VGA_COLUMNS);
     initScreen();
 
-    startProcess(userspaceProgram, stack, w);
+    startProcess(userspaceProgram, w);
 }
