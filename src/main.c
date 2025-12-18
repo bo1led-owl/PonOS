@@ -1,8 +1,8 @@
 #include "interrupts.h"
 #include "paging.h"
+#include "panic.h"
 #include "syscalls.h"
 #include "userspace.h"
-#include "utils.h"
 #include "vga.h"
 
 static void printImpl(const InterruptCtx* ctx) {
@@ -12,40 +12,50 @@ static void printImpl(const InterruptCtx* ctx) {
     printf(w, "%d\n", n);
 }
 
-static int param = 0;
+static int param = 1000;
 static WindowHandle w;
 
-static void userspaceProgram() {
-    // for (unsigned i = 0;; ++i) {
-    //     printInt(i);
-    // }
+extern void rec(int);
 
-    // infiniteLoop();
+[[noreturn]] static void userspaceProgram() {
+    rec(param);
+    exit(param);
+}
 
-    switch (param % 4) {
-        case 0:
-            exit(param);
-        case 1:
-            __asm__ volatile("mov eax, [0x42]" ::: "eax");
-            UNREACHABLE;
-        case 2:
-            infiniteRecursion();
-        case 3:
-            __asm__ volatile("mov eax, [0x900000]" ::: "eax");
-            UNREACHABLE;
-    }
+static Page* programStackLimit;
+
+static void* initProgramVirtualAddrSpace() {
+    disablePaging();
+
+    PageTableEntry* pt = allocZeroedPage();
+    assignPageDirectoryEntry(pd + 1, pt, false, true, true, true);
+
+    programStackLimit = (Page*)0x800000;
+
+    enablePaging();
+    return (void*)0x800000;
+}
+
+[[noreturn]] static void startProgram() {
+    void* stack = initProgramVirtualAddrSpace();
+    startProcess(userspaceProgram, stack, w);
 }
 
 static void stopProcess() {
+    printf(curWindowHandle(), "lowest available stack point: 0x%x\n", programStackLimit);
     disablePaging();
 
-    PageTableEntry* pt = (PageTableEntry*)(pdt[1].addr << 12);
+    PageTableEntry* pt = (PageTableEntry*)(pd[1].addr << 12);
     for (usize i = 0; i < 1024; ++i) {
+        if (!pt[i].present) {
+            continue;
+        }
+
         freePage((void*)(pt[i].addr << (usize)12));
     }
     freePage(pt);
 
-    pdt[1].present = false;
+    pd[1].present = false;
 
     enablePaging();
 }
@@ -59,7 +69,7 @@ static void exitImpl(const InterruptCtx* ctx) {
     stopProcess();
 
     param += 1;
-    startProcess(userspaceProgram, w);
+    startProgram();
 }
 
 static void pageFaultHandler(const InterruptCtx* ctx) {
@@ -82,16 +92,29 @@ static void pageFaultHandler(const InterruptCtx* ctx) {
 
     if (accessedAddress < 0x7000) {
         printf(curWindowHandle(), "NPE\n");
+    } else if (accessedAddress >= 0x400000 && accessedAddress < (usize)programStackLimit) {
+        disablePaging();
+
+        PageTableEntry* pt = (PageTableEntry*)(pd[1].addr << 12);
+        while ((usize)programStackLimit > accessedAddress) {
+            programStackLimit -= 1;
+
+            PageTableEntry* pte = pt + ((usize)programStackLimit - 0x400000) / PAGE_SIZE;
+            assignPageTableEntry(pte, allocPage(), true, true, true);
+        }
+
+        enablePaging();
+        return;
     } else if (accessedAddress >= 0x80000 && accessedAddress < 0x400000) {
         printf(curWindowHandle(), "SOE\n");
     } else {
-        printf(curWindowHandle(), "UB!\n");
+        printf(curWindowHandle(), "UB! %x %x:%x\n", accessedAddress, ctx->cs, ctx->eip);
     }
 
     stopProcess();
 
     param += 1;
-    startProcess(userspaceProgram, w);
+    startProgram();
 }
 
 static void initInterrupts() {
@@ -117,5 +140,5 @@ static void initInterrupts() {
     w = addWindow(0, 0, VGA_ROWS, VGA_COLUMNS);
     initScreen();
 
-    startProcess(userspaceProgram, w);
+    startProgram();
 }

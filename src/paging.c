@@ -4,7 +4,6 @@
 #include "mem.h"
 #include "panic.h"
 #include "types.h"
-#include "userspace.h"
 
 static constexpr usize ARENA_START = 0x400000;
 static constexpr usize ARENA_END = ARENA_START + RAM_SIZE;
@@ -12,7 +11,7 @@ static constexpr usize ARENA_END = ARENA_START + RAM_SIZE;
 static void** freeList = nullptr;
 static Page* cur = (Page*)ARENA_START;
 
-PageDirectoryEntry* pdt = nullptr;
+PageDirectoryEntry* pd = nullptr;
 
 void* allocPage() {
     if (freeList) {
@@ -64,7 +63,7 @@ void assignPageDirectoryEntry(PageDirectoryEntry* pde,
                               bool accessibleInUserspace,
                               bool writeAllowed,
                               bool present) {
-    assert(pdt);
+    assert(pd);
     assert(((usize)addr & 0x111) == 0);
 
     *pde = (PageDirectoryEntry){
@@ -80,17 +79,17 @@ void assignPageDirectoryEntry(PageDirectoryEntry* pde,
 extern void setupPagingControlRegisters(PageDirectoryEntry* pdt);
 
 void initPaging() {
-    pdt = allocZeroedPage();
+    pd = allocZeroedPage();
 
     PageTableEntry* pt = allocPage();
 
-    assignPageDirectoryEntry(pdt, pt, false, true, true, true);
+    assignPageDirectoryEntry(pd, pt, false, true, true, true);
 
     for (usize i = 0; i < 1024; ++i) {
         usize frame = i * 4 * KiB;
-        bool kernelOnly = frame < 0x7000 || (frame >= 0x80000 && frame < 0x100000);
-        assignPageTableEntry(pt + i, (void*)frame, !kernelOnly, true, true);
+        bool available = 0x7000 <= frame && frame < 0x80000;
+        assignPageTableEntry(pt + i, (void*)frame, available, true, true);
     }
 
-    setupPagingControlRegisters(pdt);
+    setupPagingControlRegisters(pd);
 }
