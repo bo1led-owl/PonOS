@@ -215,7 +215,7 @@ static const char* interruptName(u8 vector) {
     }
 }
 
-void universalHandler(const InterruptCtx* ctx) {
+void universalHandler(InterruptCtx* ctx) {
     InterruptHandler handler = handlerTable[ctx->vector];
     if (handler) {
         handler(ctx);

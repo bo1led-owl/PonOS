@@ -5,14 +5,14 @@
 #include "userspace.h"
 #include "vga.h"
 
-static void printImpl(const InterruptCtx* ctx) {
+static void printImpl(InterruptCtx* ctx) {
     const WindowHandle w = curWindowHandle();
     const usize n = ctx->edi;
 
     printf(w, "%d\n", n);
 }
 
-static int param = 1000;
+static int param = 0;
 static WindowHandle w;
 
 extern void rec(int);
@@ -36,11 +36,6 @@ static void* initProgramVirtualAddrSpace() {
     return (void*)0x800000;
 }
 
-[[noreturn]] static void startProgram() {
-    void* stack = initProgramVirtualAddrSpace();
-    startProcess(userspaceProgram, stack, w);
-}
-
 static void stopProcess() {
     printf(curWindowHandle(), "lowest available stack point: 0x%x\n", programStackLimit);
     disablePaging();
@@ -60,7 +55,7 @@ static void stopProcess() {
     enablePaging();
 }
 
-static void exitImpl(const InterruptCtx* ctx) {
+static void exitImpl(InterruptCtx* ctx) {
     const WindowHandle curW = curWindowHandle();
     const usize status = ctx->edi;
 
@@ -69,10 +64,10 @@ static void exitImpl(const InterruptCtx* ctx) {
     stopProcess();
 
     param += 1;
-    startProgram();
+    prepareCtx(ctx, userspaceProgram, initProgramVirtualAddrSpace(), w);
 }
 
-static void pageFaultHandler(const InterruptCtx* ctx) {
+static void pageFaultHandler(InterruptCtx* ctx) {
     usize accessedAddress;
     __asm__ volatile("mov %0, cr2" : "=r"(accessedAddress));
 
@@ -114,7 +109,7 @@ static void pageFaultHandler(const InterruptCtx* ctx) {
     stopProcess();
 
     param += 1;
-    startProgram();
+    prepareCtx(ctx, userspaceProgram, initProgramVirtualAddrSpace(), w);
 }
 
 static void initInterrupts() {
@@ -140,5 +135,5 @@ static void initInterrupts() {
     w = addWindow(0, 0, VGA_ROWS, VGA_COLUMNS);
     initScreen();
 
-    startProgram();
+    startProcess(userspaceProgram, initProgramVirtualAddrSpace(), w);
 }

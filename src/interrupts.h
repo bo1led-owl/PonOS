@@ -14,7 +14,7 @@ typedef struct {
 
 static_assert(sizeof(InterruptCtx) == 17 * sizeof(u32));
 
-typedef void (*InterruptHandler)(const InterruptCtx*);
+typedef void (*InterruptHandler)(InterruptCtx*);
 
 typedef struct {
     u8 vector;
@@ -40,7 +40,7 @@ u8 getSlaveDeviceMask();
 void setMasterDeviceMask(u8 mask);
 void setSlaveDeviceMask(u8 mask);
 
-void universalHandler(const InterruptCtx* ctx);
+void universalHandler(InterruptCtx* ctx);
 
 void overrideIterruptHandler(u8 vector, InterruptHandler handler);
 

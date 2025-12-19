@@ -25,9 +25,9 @@ static __attribute__((naked)) u32 getEflags() {
         "ret\n");
 }
 
-[[noreturn]] void startProcess(void (*entry)(), void* stack, WindowHandle w) {
+void prepareCtx(void* ctx, void (*entry)(), void* stack, WindowHandle w) {
     windowHandle = w;
-    FakeCtx ctx = (FakeCtx){
+    *(FakeCtx*)ctx = (FakeCtx){
         .ctx =
             (InterruptCtx){
                 .cs = APP_CODE_SEGMENT | CPL3,
@@ -41,6 +41,11 @@ static __attribute__((naked)) u32 getEflags() {
         .ss = APP_DATA_SEGMENT | CPL3,
         .esp = (usize)stack,
     };
+}
+
+[[noreturn]] void startProcess(void (*entry)(), void* stack, WindowHandle w) {
+    FakeCtx ctx;
+    prepareCtx(&ctx, entry, stack, w);
     restoreCtx(&ctx);
 }
 
