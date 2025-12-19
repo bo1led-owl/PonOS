@@ -6,7 +6,7 @@
 #include "types.h"
 
 static constexpr usize ARENA_START = 0x400000;
-static constexpr usize ARENA_END = ARENA_START + RAM_SIZE;
+static constexpr usize ARENA_END = RAM_SIZE;
 
 static void** freeList = nullptr;
 static Page* cur = (Page*)ARENA_START;
@@ -30,11 +30,7 @@ void* allocPage() {
 }
 
 void* allocZeroedPage() {
-    void* p = allocPage();
-    if (p) {
-        memzero(p, sizeof(Page));
-    }
-    return p;
+    return memzero(allocPage(), sizeof(Page));
 }
 
 void freePage(void* p) {
@@ -47,7 +43,7 @@ void assignPageTableEntry(PageTableEntry* pte,
                           bool accessibleInUserspace,
                           bool writeAllowed,
                           bool present) {
-    assert(((usize)addr & 0x111) == 0);
+    assert(((usize)addr & 0xFFF) == 0);
     *pte = (PageTableEntry){
         .accessibleInUserspace = accessibleInUserspace,
         .addr = (usize)addr >> 12,
@@ -64,7 +60,7 @@ void assignPageDirectoryEntry(PageDirectoryEntry* pde,
                               bool writeAllowed,
                               bool present) {
     assert(pd);
-    assert(((usize)addr & 0x111) == 0);
+    assert(hugePage ? ((usize)addr & 0x3FFFFF) == 0 : ((usize)addr & 0xFFF) == 0);
 
     *pde = (PageDirectoryEntry){
         .accessibleInUserspace = accessibleInUserspace,
