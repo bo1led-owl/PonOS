@@ -1,44 +1,42 @@
-{-# LANGUAGE ImportQualifiedPost #-}
-{-# OPTIONS_GHC -Wno-unused-do-bind #-}
-
 module Utils where
 
 import Build
 import Control.Exception (IOException, catch)
 import Control.Monad.Except
 import Control.Monad.Trans
+import Data.Functor
 import Data.Time
 import System.Directory
 import System.Exit
 import System.FilePath
 import System.IO
-import System.Process qualified as SP (runProcess, waitForProcess)
+import System.Process hiding (runProcess)
 
-runProcess :: FilePath -> [String] -> Build ()
-runProcess name args = do
-  handle <- lift $ SP.runProcess name args Nothing Nothing Nothing Nothing Nothing
-  exitCode <- lift $ SP.waitForProcess handle
-  case exitCode of
-    ExitSuccess -> pure ()
-    ExitFailure n -> throwError $ "Error: `" ++ name ++ "` exited with code " ++ show n
-
-runProcessSilent :: FilePath -> [String] -> Build ()
-runProcessSilent name args = do
-  out <- lift $ Just <$> nullHandle
-  handle <- lift $ SP.runProcess name args Nothing Nothing Nothing out out
-  exitCode <- lift $ SP.waitForProcess handle
-  case exitCode of
-    ExitSuccess -> pure ()
-    ExitFailure n -> throwError $ "Error: `" ++ name ++ "` exited with code " ++ show n
-
-runProcessBackground :: FilePath -> [String] -> IO ()
-runProcessBackground name args = do
-  nh <- Just <$> nullHandle
-  SP.runProcess name args Nothing Nothing nh nh nh
-  pure ()
+prettyCmdSpec :: CmdSpec -> String
+prettyCmdSpec (ShellCommand c) = c
+prettyCmdSpec (RawCommand cmd args) = showCommandForUser cmd args
 
 nullHandle :: IO Handle
 nullHandle = openFile "/dev/null" ReadWriteMode
+
+mute :: CreateProcess -> IO CreateProcess
+mute p = do
+  nh <- nullHandle
+  pure $ p {std_in = UseHandle nh, std_out = UseHandle nh, std_err = UseHandle nh}
+
+runProcess :: CreateProcess -> Build ()
+runProcess p = do
+  (_, _, _, handle) <- lift $ createProcess p
+  exitCode <- lift $ waitForProcess handle
+  case exitCode of
+    ExitSuccess -> pure ()
+    ExitFailure n -> throwError $ "Error: `" ++ prettyCmdSpec (cmdspec p) ++ "` exited with code " ++ show n
+
+runProcessBackground :: CreateProcess -> Build ()
+runProcessBackground p = (lift (mute p) >>= (lift . createProcess)) $> ()
+
+runProcessSilent :: CreateProcess -> Build ()
+runProcessSilent p = lift (mute p) >>= runProcess
 
 getFilesWithExtensions :: FilePath -> [String] -> IO [FilePath]
 getFilesWithExtensions dir extensions =

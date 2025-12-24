@@ -9,6 +9,7 @@ import Control.Monad.Reader
 import Loader
 import System.Directory
 import System.FilePath
+import System.Process (proc)
 import Target
 import Utils
 
@@ -24,7 +25,7 @@ instance Target Kernel where
     linkKernel config objs
   deps Kernel = do
     c <- depsFromList id <$> lift cFiles
-    pure $ Loader :> c
+    pure (Loader :> c)
   artifact Kernel = getFromConfig kernelBin
   name Kernel = Just "kernel"
 
@@ -34,12 +35,12 @@ cFiles = map Clang <$> getFilesWithExtensions srcdir [".c"]
 linkKernel :: Config -> [FilePath] -> Build ()
 linkKernel config objs = do
   ld kernelElf objs
-  runProcess "objcopy" ["-I", "elf32-i386", "-O", "binary", kernelElf, kernelBin config]
+  runProcess $ proc "objcopy" ["-I", "elf32-i386", "-O", "binary", kernelElf, kernelBin config]
   where
-    kernelElf = outdirByConfig config </> "kernel.elf"
+    kernelElf = kernelElfByConfig config
 
 ld :: FilePath -> [FilePath] -> Build ()
-ld output = runProcess "ld.lld" . (["-e", "kernelEntry", "-T", "link.ld", "-o", output] ++)
+ld output = runProcess . proc "ld.lld" . (["-e", "kernelEntry", "-T", "link.ld", "-o", output] ++)
 
 kernelBin :: Config -> FilePath
 kernelBin config = outdirByConfig config </> "kernel.bin"

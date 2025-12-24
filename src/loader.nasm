@@ -70,13 +70,6 @@ mov es, eax
 mov fs, eax
 mov gs, eax
 
-; setup tss descriptor
-mov eax, tss
-mov word [tssSd + 2], ax
-shr eax, 16
-mov byte [tssSd + 4], al
-mov byte [tssSd + 7], ah
-
 mov ax, TSS_SEGMENT
 ltr ax
 
@@ -86,54 +79,10 @@ call kernelEntry
 end:
     hlt
 
-extern universalHandler
-global collectCtx
-collectCtx:
-    push ds
-    push es
-    push fs
-    push gs
-    pusha
-
-    ; clear D flag
-    cld
-
-    ; reset segment registers
-    mov eax, KERNEL_DATA_SEGMENT
-    mov ds, eax
-    mov es, eax
-    mov fs, eax
-    mov gs, eax
-
-    mov ebx, esp
-
-    ; align stack
-    lea ecx, [esp + 12]
-    and ecx, 0xF
-    sub esp, ecx
-
-    push ebx
-    call universalHandler
-    mov esp, ebx
-restoreCtxFromEsp:
-    popa
-    pop gs
-    pop fs
-    pop es
-    pop ds
-    add esp, 8 ; error code and vector
-    iret
-
-global restoreCtx
-restoreCtx:
-    mov esp, [esp + 4]
-    jmp restoreCtxFromEsp
-
-global getEflags
-getEflags:
-    pushfd
-    pop eax
-    ret
+%include "src/interrupts.nasm"
+%include "src/paging.nasm"
+%include "src/syscalls.nasm"
+%include "src/utils.nasm"
 
 bits 16
 handleErr:
@@ -186,11 +135,11 @@ gdt:
         .baseHi:            db 0
     tssSd:
         .limitLo:           dw 0x6B
-        .baseLo:            dw 0           ; set at runtime
-        .baseMid:           db 0           ; set at runtime
+        .baseLo:            dw tss
+        .baseMid:           db 0 
         .P_DPL_S_type:      db 0b1000_1001
         .G_0_0_AVL_limitHi: db 0b0000_0000
-        .baseHi:            db 0           ; set at runtime
+        .baseHi:            db 0
 
 tss:
     dd 0

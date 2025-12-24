@@ -4,7 +4,6 @@
 
 #include "interrupts.h"
 #include "types.h"
-#include "utils.h"
 
 typedef struct {
     InterruptCtx ctx;
@@ -12,16 +11,23 @@ typedef struct {
     alignas(4) u16 ss;
 } FakeCtx;
 
-constexpr u32 IOPL_0 = ~((u32)0b11 << 12);
-constexpr u32 ENABLE_IF = 1 << 9;
-constexpr u32 CPL3 = 0b11;
-constexpr u32 RPL3 = 0b11;
+static constexpr u32 IOPL_0 = ~((u32)0b11 << 12);
+static constexpr u32 ENABLE_IF = 1 << 9;
+static constexpr u32 CPL3 = 0b11;
+static constexpr u32 RPL3 = 0b11;
 
 static WindowHandle windowHandle;
 
-[[noreturn]] void startProcess(void (*entry)(), void* stack, WindowHandle w) {
+static __attribute__((naked)) u32 getEflags() {
+    __asm__ volatile(
+        "pushfd\n"
+        "pop eax\n"
+        "ret\n");
+}
+
+void prepareCtx(void* ctx, void (*entry)(), void* stack, WindowHandle w) {
     windowHandle = w;
-    FakeCtx ctx = (FakeCtx){
+    *(FakeCtx*)ctx = (FakeCtx){
         .ctx =
             (InterruptCtx){
                 .cs = APP_CODE_SEGMENT | CPL3,
@@ -35,6 +41,11 @@ static WindowHandle windowHandle;
         .ss = APP_DATA_SEGMENT | CPL3,
         .esp = (usize)stack,
     };
+}
+
+[[noreturn]] void startProcess(void (*entry)(), void* stack, WindowHandle w) {
+    FakeCtx ctx;
+    prepareCtx(&ctx, entry, stack, w);
     restoreCtx(&ctx);
 }
 

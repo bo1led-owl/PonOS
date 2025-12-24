@@ -12,6 +12,7 @@ CompileFlags:
     -DAPP_CODE_SEGMENT,
     -DAPP_DATA_SEGMENT,
     -DTSS_SEGMENT,
+    -DRAM_SIZE,
   ]
 
 ---

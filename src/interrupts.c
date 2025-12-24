@@ -25,8 +25,8 @@ typedef struct {
 
 static_assert(sizeof(IdtEntry) == 8);
 
-constexpr usize TRAMPOLINE_SIZE = 8;
-constexpr usize N_VECTORS = 256;
+static constexpr usize TRAMPOLINE_SIZE = 8;
+static constexpr usize N_VECTORS = 256;
 
 static bool hasErrorCode(u8 vector) {
     switch (vector) {
@@ -97,11 +97,11 @@ static void* genIdt(const u8* trampolines) {
     return idtBase;
 }
 
-constexpr u16 MASTER_COMMAND_PORT = 0x20;
-constexpr u16 MASTER_DATA_PORT = 0x21;
+static constexpr u16 MASTER_COMMAND_PORT = 0x20;
+static constexpr u16 MASTER_DATA_PORT = 0x21;
 
-constexpr u16 SLAVE_COMMAND_PORT = 0xA0;
-constexpr u16 SLAVE_DATA_PORT = 0xA1;
+static constexpr u16 SLAVE_COMMAND_PORT = 0xA0;
+static constexpr u16 SLAVE_DATA_PORT = 0xA1;
 
 u8 getMasterDeviceMask() {
     return ~readFromPort(MASTER_DATA_PORT);
@@ -215,7 +215,7 @@ static const char* interruptName(u8 vector) {
     }
 }
 
-void universalHandler(const InterruptCtx* ctx) {
+void universalHandler(InterruptCtx* ctx) {
     InterruptHandler handler = handlerTable[ctx->vector];
     if (handler) {
         handler(ctx);

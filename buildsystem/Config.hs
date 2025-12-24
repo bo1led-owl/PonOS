@@ -19,15 +19,32 @@ outdir = "build"
 outdirByConfig :: Config -> FilePath
 outdirByConfig (Config mode asserts) = outdir </> show mode </> (if asserts then "assert" else "noassert")
 
+kernelElfByConfig :: Config -> FilePath
+kernelElfByConfig config = outdirByConfig config </> "kernel.elf"
+
 imgFileByConfig :: Config -> FilePath
 imgFileByConfig config = outdirByConfig config </> "boot.img"
 
 kernelSizeKb :: Integer
 kernelSizeKb = 20
 
+data RamSize = MiB Integer | GiB Integer
+
+ramSize :: RamSize
+ramSize = GiB 1
+
+ramSizeForQemu :: RamSize -> String
+ramSizeForQemu (GiB n) = show n ++ "G"
+ramSizeForQemu (MiB n) = show n ++ "M"
+
+ramSizeToBytes :: RamSize -> Integer
+ramSizeToBytes (GiB n) = ramSizeToBytes (MiB (1024 * n))
+ramSizeToBytes (MiB n) = 1024 * 1024 * n
+
 constants :: [String]
 constants =
   ("-DKERNEL_SIZE_KB=" ++ show kernelSizeKb)
+    : ("-DRAM_SIZE=" ++ show (ramSizeToBytes ramSize))
     : zipWith format names offsets
   where
     format name offset = "-D" ++ name ++ "=" ++ show offset
@@ -70,7 +87,7 @@ qemuFlags img =
   [ "-cpu",
     "pentium2",
     "-m",
-    "4m",
+    ramSizeForQemu ramSize,
     "-monitor",
     "stdio",
     "-device",
