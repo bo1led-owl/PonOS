@@ -1,13 +1,17 @@
 bits 32
 
-global setupPagingControlRegisters
-setupPagingControlRegisters:
+global initPaging
+initPaging:
     mov eax, cr4
     or eax, (1 << 4)
     mov cr4, eax
     mov eax, cr0
     and eax, ~(1 << 16)
     mov cr0, eax
+    ret
+
+global setPageDirectory
+setPageDirectory:
     mov eax, [esp + 4]
     mov cr3, eax
     ret

@@ -55,7 +55,7 @@ buildImage = runTarget Image
 run :: Build ()
 run = do
   img <- getFromConfig imgFileByConfig
-  runProcessSilent $ proc "qemu-system-i386" (qemuFlags img)
+  runProcess $ proc "qemu-system-i386" (qemuFlags img)
 
 debug :: Build ()
 debug = do

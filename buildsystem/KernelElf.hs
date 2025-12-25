@@ -1,36 +1,34 @@
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
-module Kernel (Kernel (..)) where
+module KernelElf (KernelElf (..)) where
 
 import Build
 import Clang
 import Config
 import Control.Monad.Reader
 import Loader
-import System.Directory
 import System.FilePath
 import System.Process (proc)
 import Target
 import Utils
 
-data Kernel = Kernel
+data KernelElf = KernelElf
 
-instance Target Kernel where
-  build Kernel = do
+instance Target KernelElf where
+  build KernelElf = do
     config <- getConfig
-    lift $ createDirectoryIfMissing True (outdirByConfig config)
     loaderO <- artifact Loader
     cObjects <- lift cFiles >>= traverse artifact
     let objs = loaderO : cObjects
     linkKernel config objs
-  deps Kernel = do
+  deps KernelElf = do
     c <- depsFromList id <$> lift cFiles
     pure (Loader :> c)
-  artifact Kernel = getFromConfig kernelBin
-  name Kernel = Just "kernel"
+  artifact KernelElf = getFromConfig kernelBin
+  name KernelElf = Just "kernel"
 
 cFiles :: IO [Clang]
-cFiles = map Clang <$> getFilesWithExtensions srcdir [".c"]
+cFiles = map (Clang Kernel) <$> getFilesWithExtensions kernelSrcDir [".c"]
 
 linkKernel :: Config -> [FilePath] -> Build ()
 linkKernel config objs = do
@@ -40,7 +38,7 @@ linkKernel config objs = do
     kernelElf = kernelElfByConfig config
 
 ld :: FilePath -> [FilePath] -> Build ()
-ld output = runProcess . proc "ld.lld" . (["-e", "kernelEntry", "-T", "link.ld", "-o", output] ++)
+ld output = runProcess . proc "ld.lld" . (["-T", kernelSrcDir </> "link.ld", "-o", output] ++)
 
 kernelBin :: Config -> FilePath
-kernelBin config = outdirByConfig config </> "kernel.bin"
+kernelBin config = outdirByConfig Kernel config </> "kernel.bin"

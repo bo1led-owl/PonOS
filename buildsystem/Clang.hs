@@ -19,30 +19,29 @@ import Text.Megaparsec
 import Text.Megaparsec.Char
 import Utils
 
-newtype Clang = Clang FilePath
+data Clang = Clang Mod FilePath
 
 instance Target Clang where
-  build c@(Clang file) = do
+  build c@(Clang m file) = do
     config <- getConfig
     output <- artifact c
-    runProcess $ proc "clang" (clangFlags config ++ ["-c", file, "-o", output])
-
-  deps c@(Clang input) = do
+    runProcess $ proc "clang" (clangFlags m config ++ ["-c", file, "-o", output])
+  deps c@(Clang m input) = do
     artifactModTime <- artifact c >>= lift . getModTime
-    getDeps input artifactModTime
-  artifact (Clang file) = getFromConfig (\c -> ((`replaceDirectory` outdirByConfig c) . (-<.> "o")) file)
-  name (Clang file) = Just file
+    getDeps m input artifactModTime
+  artifact (Clang m file) = getFromConfig (\c -> ((`replaceDirectory` outdirByConfig m c) . (<.> "o")) file)
+  name (Clang _ file) = Just file
 
-getDeps :: FilePath -> Maybe UTCTime -> BuildT IO Deps
-getDeps input artifactModTime = do
-  let depFile = outdir </> "deps" </> replaceExtension input "d"
+getDeps :: Mod -> FilePath -> Maybe UTCTime -> BuildT IO Deps
+getDeps m input artifactModTime = do
+  let depFile = outdirMod m </> "deps" </> replaceExtension input "d"
   depFileModTime <- lift $ getModTime depFile
   let depFileIsUpToDate = maybe False (uncurry (>=)) ((,) <$> depFileModTime <*> artifactModTime)
   unless
     depFileIsUpToDate
     ( do
         lift $ createDirectoryIfMissing True (takeDirectory depFile)
-        flags <- getFromConfig clangFlags
+        flags <- getFromConfig (clangFlags m)
         runProcess $ proc "clang" (flags ++ ["-MM", "-MF", depFile, input])
     )
   depFileContents <- lift $ readFile' depFile

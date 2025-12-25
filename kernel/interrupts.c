@@ -5,6 +5,7 @@
 #include "hardwareIo.h"
 #include "mem.h"
 #include "panic.h"
+#include "userspace.h"
 
 extern void collectCtx();
 
@@ -220,6 +221,11 @@ void universalHandler(InterruptCtx* ctx) {
     if (handler) {
         handler(ctx);
         return;
+    }
+
+    bool fromUserspace = ctx->cs & 0b11;
+    if (fromUserspace) {
+        stopCurProcess();
     }
 
 #define MSG_WITHOUT_ERROR_CODE                                                      \
