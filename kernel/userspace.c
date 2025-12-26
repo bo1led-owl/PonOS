@@ -147,7 +147,7 @@ static PageDirectoryEntry* initProcessVirtualAddrSpace(usize package, int argc, 
         assignPageTableEntry(pt + i + 17, argPage, true, false, true);
 
         char* arg = va_arg(argv, char*);
-        memcpy(argPage, arg, strlen(arg));
+        memcpy(argPage, arg, strlen(arg) + 1);
     }
 
     for (int i = 0; i < argc; ++i) {

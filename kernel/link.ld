@@ -1,7 +1,7 @@
 SECTIONS {
     . = 0x7C00;
     .boot : {
-        build/kernel/loader.o (.text);
+        build/kernel/loader.nasm.o (.text);
     }
 
     .kernel : {

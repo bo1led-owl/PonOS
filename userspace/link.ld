@@ -1,7 +1,7 @@
 SECTIONS {
     . = 0x800000;
     .startup : {
-        build/userspace/startup.o (.text);
+        build/userspace/startup.nasm.o (.text);
     }
 
     .userspace : {
