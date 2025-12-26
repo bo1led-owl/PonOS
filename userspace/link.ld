@@ -1,10 +1,10 @@
 SECTIONS {
-    . = 0x7C00;
-    .boot : {
-        build/loader.o (.text);
+    . = 0x800000;
+    .startup : {
+        build/userspace/startup.nasm.o (.text);
     }
 
-    .kernel : {
+    .userspace : {
         *(.text);
         *(.rodata);
         *(.rodata.*);

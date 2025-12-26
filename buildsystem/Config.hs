@@ -2,31 +2,47 @@ module Config where
 
 import System.FilePath
 
-data Mode = Dev | Release
+data Mod = Kernel | Userspace deriving (Eq)
+
+data Mode = Dev | Release deriving (Eq)
 
 data Config = Config {buildMode :: Mode, enableAsserts :: Bool}
+
+instance Show Mod where
+  show Kernel = "kernel"
+  show Userspace = "userspace"
 
 instance Show Mode where
   show Dev = "dev"
   show Release = "release"
 
-srcdir :: FilePath
-srcdir = "src"
+kernelSrcDir :: FilePath
+kernelSrcDir = "kernel"
+
+userspaceSrcDir :: FilePath
+userspaceSrcDir = "userspace"
+
+userspacePrograms :: [String]
+userspacePrograms = ["finite", "counter", "fibonacci", "factorial"]
 
 outdir :: FilePath
 outdir = "build"
 
-outdirByConfig :: Config -> FilePath
-outdirByConfig (Config mode asserts) = outdir </> show mode </> (if asserts then "assert" else "noassert")
+outdirMod :: Mod -> FilePath
+outdirMod m = outdir </> show m
+
+outdirByConfig :: Mod -> Config -> FilePath
+outdirByConfig m (Config mode asserts) =
+  outdirMod m </> show mode </> (if asserts then "assert" else "noassert")
 
 kernelElfByConfig :: Config -> FilePath
-kernelElfByConfig config = outdirByConfig config </> "kernel.elf"
+kernelElfByConfig config = outdirByConfig Kernel config </> "kernel.elf"
 
 imgFileByConfig :: Config -> FilePath
-imgFileByConfig config = outdirByConfig config </> "boot.img"
+imgFileByConfig config = outdirByConfig Kernel config </> "boot.img"
 
 kernelSizeKb :: Integer
-kernelSizeKb = 20
+kernelSizeKb = 0x58400 `div` 1024
 
 data RamSize = MiB Integer | GiB Integer
 
@@ -58,8 +74,8 @@ constants =
     offsets :: [Int]
     offsets = [i * 8 | i <- [1 ..]]
 
-clangFlags :: Config -> [String]
-clangFlags (Config mode asserts) = prependIf "-DNDEBUG" flags (not asserts)
+clangFlags :: Mod -> Config -> [String]
+clangFlags m (Config mode asserts) = prependIf "-DNDEBUG" flags (not asserts)
   where
     flags =
       [ "-Wall",
@@ -77,7 +93,7 @@ clangFlags (Config mode asserts) = prependIf "-DNDEBUG" flags (not asserts)
           Dev -> "-O0"
           Release -> "-Oz"
       ]
-        ++ constants
+        ++ if m == Kernel then constants else []
     prependIf :: a -> [a] -> Bool -> [a]
     prependIf x xs True = x : xs
     prependIf _ xs False = xs

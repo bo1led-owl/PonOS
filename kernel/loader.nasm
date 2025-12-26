@@ -1,7 +1,6 @@
 bits 16
 
-; geometry: https://www.deathwombat.com/diskgeometry.html
-%define SECTORS_PER_TRACK 18
+%define SECTORS_PER_TRACK 36
 %define HEADS_PER_CYLINDER 2
 
 cli
@@ -31,7 +30,7 @@ readLoop:
     add di, 0x20 ; move dest
     mov es, di
 
-    add cl, 1 ; next sector
+    inc cl ; next sector
     cmp cl, SECTORS_PER_TRACK
     jbe .continueReading
     ; should move header
@@ -43,7 +42,7 @@ readLoop:
     xor dh, dh ; reset header
     inc ch     ; next cylinder
 .continueReading:
-    sub si, 1
+    dec si
     jnz readLoop
 
 ; disable cursor
@@ -79,10 +78,9 @@ call kernelEntry
 end:
     hlt
 
-%include "src/interrupts.nasm"
-%include "src/paging.nasm"
-%include "src/syscalls.nasm"
-%include "src/utils.nasm"
+%include "kernel/interrupts.nasm"
+%include "kernel/paging.nasm"
+%include "kernel/utils.nasm"
 
 bits 16
 handleErr:
